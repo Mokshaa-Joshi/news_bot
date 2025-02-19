@@ -1,75 +1,75 @@
 import os
+import pinecone
 import openai
-import streamlit as st
-from pinecone import Pinecone
+import datetime
 from deep_translator import GoogleTranslator
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
+# Load API keys
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+PINECONE_ENV = os.getenv("PINECONE_ENV")
+PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 # Initialize Pinecone
-pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-index_name = os.getenv("PINECONE_INDEX_NAME")
+pinecone.init(api_key=PINECONE_API_KEY, environment=PINECONE_ENV)
+index = pinecone.Index(PINECONE_INDEX_NAME)
 
-# Check if index exists
-if index_name not in pc.list_indexes().names():
-    st.error(f"Index '{index_name}' not found in Pinecone. Please check your configuration.")
-    st.stop()
+openai.api_key = OPENAI_API_KEY
 
-index = pc.Index(index_name)
-
-# OpenAI API Key
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
-# Streamlit UI
-st.set_page_config(page_title="Gujarati News Bot", page_icon="📰", layout="centered")
-
-st.title("📰 Gujarati News Bot")
-st.write("Enter your news query in **English or Gujarati** and get relevant news articles.")
-
-# User Input
-user_query = st.text_input("🔎 Search for news:")
-
-if user_query:
-    # Detect language and translate if needed
-    translated_text = GoogleTranslator(source="auto", target="en").translate(user_query)
-    detected_lang = "gu" if translated_text != user_query else "en"
-
-    if detected_lang == "en":
-        user_query = GoogleTranslator(source="en", target="gu").translate(user_query)
-
-    st.write(f"🔄 Searching news for: **{user_query}**")
-
-    # Generate embeddings for query
-    embed_response = openai.embeddings.create(input=[user_query], model="text-embedding-ada-002")
-    query_vector = embed_response.data[0].embedding  # Extract vector
-
-    # Perform vector search (Hybrid: Title & Content relevance)
-    search_results = index.query(
-        vector=query_vector,  
-        top_k=5,
-        include_metadata=True,
-        filter={  # Only filter metadata fields that exist in Pinecone
-            "date": {"$eq": "2025-02-19"}  # Example: Filter by today's date (modify as needed)
-        }
+def extract_keywords(prompt):
+    """Extract keywords using OpenAI API."""
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "Extract keywords from the given prompt."},
+            {"role": "user", "content": prompt}
+        ]
     )
+    return response["choices"][0]["message"]["content"].split(', ')
 
-    # Display Results
-    if search_results.get("matches"):
-        news_articles = []
-        for match in search_results["matches"]:
-            metadata = match["metadata"]
-            news_articles.append(f"**{metadata['title']}**\n📅 {metadata['date']}\n🔗 [Read More]({metadata['link']})\n\n{metadata['content'][:300]}...")
+def standardize_date(user_date):
+    """Convert various date formats into a standard YYYY-MM-DD format."""
+    try:
+        parsed_date = datetime.datetime.strptime(user_date, "%Y-%m-%d")
+    except ValueError:
+        try:
+            parsed_date = datetime.datetime.strptime(user_date, "%d-%m-%Y")
+        except ValueError:
+            try:
+                parsed_date = datetime.datetime.strptime(user_date, "%d/%m/%Y")
+            except ValueError:
+                parsed_date = None
+    
+    return parsed_date.strftime("%Y-%m-%d") if parsed_date else None
 
-        # Format response using OpenAI
-        response = openai.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a Gujarati news bot. Format news concisely and in Gujarati."},
-                {"role": "user", "content": "\n\n".join(news_articles)}
-            ]
-        )
-        st.markdown(response.choices[0].message.content)
-    else:
-        st.warning("❌ No relevant news found. Try a different query.")
+def search_news(prompt, user_date=None, lang="gu"):
+    """Search news articles in Pinecone using keyword matching."""
+    translated_prompt = GoogleTranslator(source='auto', target='en').translate(prompt)
+    keywords = extract_keywords(translated_prompt)
+    query_embedding = openai.Embedding.create(input=translated_prompt, model="text-embedding-ada-002")["data"][0]["embedding"]
+    
+    results = index.query(vector=query_embedding, top_k=10, include_metadata=True)
+    
+    if user_date:
+        standardized_date = standardize_date(user_date)
+    
+    for match in results["matches"]:
+        metadata = match["metadata"]
+        if all(keyword.lower() in metadata["title"].lower() or keyword.lower() in metadata["content"].lower() for keyword in keywords):
+            if user_date is None or metadata["date"] == standardized_date:
+                return {
+                    "title": metadata["title"],
+                    "date": metadata["date"],
+                    "link": metadata["link"],
+                    "content": metadata["content"]
+                }
+    return "No matching news found."
+
+# Example usage
+user_prompt = "ગુજરાતમાં ભારે વરસાદ"
+user_date = "15-02-2024"
+result = search_news(user_prompt, user_date)
+print(result)
