@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import re
 from pinecone import Pinecone
 from deep_translator import GoogleTranslator
 import openai
@@ -21,6 +22,12 @@ index = pc.Index("newsbot")
 def translate_to_gujarati(text):
     return GoogleTranslator(source='auto', target='gu').translate(text)
 
+# Function to extract date from query
+def extract_date(query):
+    date_pattern = r"\b\d{2}-\d{2}-\d{4}\b"
+    match = re.search(date_pattern, query)
+    return match.group() if match else None
+
 # Function to generate query embeddings using OpenAI
 def get_embedding(text):
     response = client.embeddings.create(
@@ -29,10 +36,35 @@ def get_embedding(text):
     )
     return response.data[0].embedding
 
-# Function to search news in Pinecone
+# Function to search news in Pinecone with metadata filtering
 def search_news(query):
-    query_embedding = get_embedding(query)
-    results = index.query(vector=query_embedding, top_k=5, include_metadata=True)
+    # Extract date if mentioned in query
+    extracted_date = extract_date(query)
+    
+    # Remove date from query before translation
+    cleaned_query = re.sub(r"\b\d{2}-\d{2}-\d{4}\b", "", query).strip()
+    
+    # Translate input to Gujarati
+    translated_query = translate_to_gujarati(cleaned_query)
+    
+    # Generate embeddings for the query
+    query_embedding = get_embedding(translated_query)
+
+    # Search in Pinecone with date filtering
+    if extracted_date:
+        results = index.query(
+            vector=query_embedding, 
+            top_k=5, 
+            include_metadata=True,
+            filter={"date": {"$eq": extracted_date}}  # Filters only news from the mentioned date
+        )
+    else:
+        results = index.query(
+            vector=query_embedding, 
+            top_k=5, 
+            include_metadata=True
+        )
+
     return results["matches"]
 
 # Streamlit UI
@@ -42,11 +74,8 @@ user_query = st.text_input("Enter your query (English or Gujarati):")
 
 if st.button("Search"):
     if user_query:
-        # Translate input if in English
-        translated_query = translate_to_gujarati(user_query)
-        
         # Search news in Pinecone
-        results = search_news(translated_query)
+        results = search_news(user_query)
         
         # Display results
         if results:
