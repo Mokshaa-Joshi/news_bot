@@ -1,6 +1,5 @@
 import streamlit as st
 import os
-import re
 from pinecone import Pinecone
 from deep_translator import GoogleTranslator
 import openai
@@ -32,18 +31,26 @@ def get_embedding(text):
 
 # Function to check for an exact match using metadata filtering
 def exact_match_search(query):
-    results = index.query(
-        top_k=5, 
-        include_metadata=True,
-        filter={"title": {"$regex": query}}  # Checks if the title contains the query
-    )
-    return results["matches"]
+    try:
+        results = index.query(
+            top_k=5,
+            include_metadata=True,
+            filter={"title": {"$eq": query}}  # Exact title match
+        )
+        return results["matches"]
+    except Exception as e:
+        st.error(f"Metadata search error: {e}")
+        return []
 
 # Function to search news using vector search (fallback)
 def semantic_search(query):
     query_embedding = get_embedding(query)
-    results = index.query(vector=query_embedding, top_k=5, include_metadata=True)
-    return results["matches"]
+    try:
+        results = index.query(vector=query_embedding, top_k=5, include_metadata=True)
+        return results["matches"]
+    except Exception as e:
+        st.error(f"Vector search error: {e}")
+        return []
 
 # Function to perform hybrid search
 def search_news(query):
