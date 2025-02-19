@@ -2,7 +2,7 @@ import os
 import streamlit as st
 import pinecone
 import openai
-import datetime
+from dateutil import parser
 from deep_translator import GoogleTranslator
 from dotenv import load_dotenv
 
@@ -13,8 +13,7 @@ PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Initialize Pinecone
-from pinecone import Pinecone
-pc = Pinecone(api_key=PINECONE_API_KEY)
+pc = pinecone.Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(PINECONE_INDEX_NAME)
 
 # Initialize OpenAI client
@@ -25,46 +24,45 @@ def extract_keywords(prompt):
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "Extract keywords from the given prompt."},
+            {"role": "system", "content": "Extract the most relevant keywords from the given query."},
             {"role": "user", "content": prompt}
         ]
     )
-    return response.choices[0].message.content.split(', ')
+    return response.choices[0].message.content.lower().split(", ")
 
 def standardize_date(user_date):
     """Convert various date formats into a standard YYYY-MM-DD format."""
     try:
-        parsed_date = datetime.datetime.strptime(user_date, "%Y-%m-%d")
-    except ValueError:
-        try:
-            parsed_date = datetime.datetime.strptime(user_date, "%d-%m-%Y")
-        except ValueError:
-            try:
-                parsed_date = datetime.datetime.strptime(user_date, "%d/%m/%Y")
-            except ValueError:
-                parsed_date = None
-    
-    return parsed_date.strftime("%Y-%m-%d") if parsed_date else None
+        parsed_date = parser.parse(user_date)
+        return parsed_date.strftime("%Y-%m-%d")
+    except Exception:
+        return None
 
 def search_news(prompt, user_date=None):
-    """Search news articles in Pinecone using keyword matching."""
-    translated_prompt = GoogleTranslator(source='auto', target='en').translate(prompt)
+    """Search exact matching news articles in Pinecone."""
+    translated_prompt = GoogleTranslator(source="auto", target="en").translate(prompt)
     keywords = extract_keywords(translated_prompt)
-    query_embedding = client.embeddings.create(input=[translated_prompt], model="text-embedding-ada-002").data[0].embedding
-    
-    results = index.query(vector=query_embedding, top_k=10, include_metadata=True)
-    
+
+    # Query Pinecone for all stored records
+    results = index.query(vector=None, filter={}, top_k=100, include_metadata=True)
+
     standardized_date = standardize_date(user_date) if user_date else None
-    
+
     for match in results["matches"]:
         metadata = match["metadata"]
-        if all(keyword.lower() in metadata["title"].lower() or keyword.lower() in metadata["content"].lower() for keyword in keywords):
-            if user_date is None or metadata["date"] == standardized_date:
+        title = metadata["title"].lower()
+        content = metadata["content"].lower()
+        record_date = metadata["date"]
+
+        # Check if keywords match in title or content
+        if all(keyword in title or keyword in content for keyword in keywords):
+            # Ensure exact date match if provided
+            if not user_date or record_date == standardized_date:
                 return {
                     "title": metadata["title"],
                     "date": metadata["date"],
                     "link": metadata["link"],
-                    "content": metadata["content"]
+                    "content": metadata["content"],
                 }
     return None
 
@@ -80,12 +78,13 @@ if st.button("Search News"):
     if query:
         result = search_news(query, date_input)
         if result:
+            # Display formatted output
             st.subheader(result["title"])
-            st.write(f"📅 **Date:** {result["date"]}")
-            st.write(f"🔗 [Read more]({result['link']})")
-            st.write("---")
-            st.write(result["content"])
+            st.markdown(f"**📅 Date:** `{result['date']}`")
+            st.markdown(f"**🔗 Read More:** [Click Here]({result['link']})")
+            st.markdown("---")
+            st.markdown(f"**📝 Content:**\n{result['content']}")
         else:
-            st.warning("No matching news found.")
+            st.warning("❌ No matching news found.")
     else:
-        st.error("Please enter a query.")
+        st.error("⚠️ Please enter a query.")
