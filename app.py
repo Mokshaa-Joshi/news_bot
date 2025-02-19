@@ -1,98 +1,70 @@
-import os
 import streamlit as st
-import openai
-from pinecone import Pinecone
-from dateutil import parser
-from deep_translator import GoogleTranslator
+import pinecone
+import os
+import re
+from datetime import datetime
 from dotenv import load_dotenv
+from openai import OpenAI
+from deep_translator import GoogleTranslator
 
 # Load environment variables
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
+PINECONE_ENV = os.getenv("PINECONE_ENV")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Initialize Pinecone
-pc = Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index(PINECONE_INDEX_NAME)  # Use new Pinecone instance method
+pinecone.init(api_key=PINECONE_API_KEY, environment=PINECONE_ENV)
+index = pinecone.Index("gujarati-news")
 
-# Initialize OpenAI client
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
+# Initialize OpenAI
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 def extract_keywords(prompt):
-    """Extract keywords using OpenAI API."""
-    response = client.chat.completions.create(
+    response = client.completions.create(
         model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "Extract the most relevant keywords from the given query."},
-            {"role": "user", "content": prompt}
-        ]
+        prompt=f"Extract important keywords from this query: {prompt}",
+        max_tokens=10
     )
-    return response.choices[0].message.content.lower().split(", ")
+    return response.choices[0].text.strip()
 
-def standardize_date(user_date):
-    """Convert various date formats into a standard YYYY-MM-DD format."""
-    try:
-        parsed_date = parser.parse(user_date)
-        return parsed_date.strftime("%Y-%m-%d")
-    except Exception:
-        return None
-
-def search_news(prompt, user_date=None):
-    """Search exact matching news articles in Pinecone using metadata filtering."""
-    translated_prompt = GoogleTranslator(source="auto", target="en").translate(prompt)
-    keywords = extract_keywords(translated_prompt)
-
-    # Standardize the date format
-    standardized_date = standardize_date(user_date) if user_date else None
-
-    # Construct metadata filter query
-    metadata_filter = {"$and": []}
-    
-    for keyword in keywords:
-        metadata_filter["$and"].append({
-            "$or": [
-                {"title": {"$contains": keyword}},
-                {"content": {"$contains": keyword}}
-            ]
-        })
-    
-    if standardized_date:
-        metadata_filter["$and"].append({"date": standardized_date})
-
-    # Query Pinecone with metadata filter
-    results = index.query(filter=metadata_filter, top_k=10, include_metadata=True)
-
-    for match in results["matches"]:
-        metadata = match["metadata"]
-        return {
-            "title": metadata["title"],
-            "date": metadata["date"],
-            "link": metadata["link"],
-            "content": metadata["content"],
-        }
-    
+def parse_date(user_date):
+    formats = ["%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y", "%m-%d-%Y"]
+    for fmt in formats:
+        try:
+            return datetime.strptime(user_date, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
     return None
 
-# Streamlit UI
-st.set_page_config(page_title="Gujarati News Bot", layout="wide")
-st.title("📰 Gujarati News Bot")
+def search_news(query):
+    translated_query = GoogleTranslator(source='auto', target='gu').translate(query)
+    keywords = extract_keywords(translated_query)
+    
+    date_match = re.search(r'\d{1,2}[-/]\d{1,2}[-/]\d{4}', query)
+    date_formatted = parse_date(date_match.group()) if date_match else None
+    
+    results = index.query(keywords, top_k=5, include_metadata=True)
+    for result in results["matches"]:
+        record = result["metadata"]
+        if keywords in record["title"] and (date_formatted is None or date_formatted == record["date"]):
+            return record
+    return None
 
-# Input fields
-query = st.text_input("Enter your query in Gujarati:")
-date_input = st.text_input("Enter date (optional, any format):")
-
-if st.button("Search News"):
-    if query:
-        result = search_news(query, date_input)
+def main():
+    st.title("Gujarati News Bot 📰")
+    user_query = st.text_input("Enter your news query:")
+    
+    if st.button("Search") and user_query:
+        result = search_news(user_query)
+        
         if result:
-            # Display formatted output
             st.subheader(result["title"])
-            st.markdown(f"**📅 Date:** `{result['date']}`")
-            st.markdown(f"**🔗 Read More:** [Click Here]({result['link']})")
-            st.markdown("---")
-            st.markdown(f"**📝 Content:**\n{result['content']}")
+            st.write(f"**Date:** {result['date']}")
+            st.write(f"[Read more]({result['link']})")
+            st.write(result["content"])
         else:
-            st.warning("❌ No matching news found.")
-    else:
-        st.error("⚠️ Please enter a query.")
+            st.error("No exact match found. Try refining your query.")
+
+if __name__ == "__main__":
+    main()
