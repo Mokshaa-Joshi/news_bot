@@ -34,15 +34,19 @@ def search_news(query):
     # Translate query to Gujarati (if needed)
     translated_query = translate_to_gujarati(query)
 
-    # **1. Search for exact keyword in the content metadata**
-    keyword_results = index.query(
-        vector=None,  # No vector search, only metadata filtering
-        top_k=5,
-        include_metadata=True,
-        filter={
-            "content": {"$regex": translated_query}  # Look for exact match in content
-        }
-    )
+    # **1. Try metadata filtering (search by keyword in content)**
+    try:
+        keyword_results = index.query(
+            id="",  # Fix: Use a valid ID placeholder (empty string) instead of None
+            top_k=5,
+            include_metadata=True,
+            filter={
+                "content": {"$regex": translated_query}  # Search for exact keyword match
+            }
+        )
+    except Exception as e:
+        print(f"Metadata filtering error: {e}")
+        keyword_results = {"matches": []}
 
     # **If keyword search finds results, return them first**
     if keyword_results["matches"]:
