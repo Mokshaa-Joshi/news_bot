@@ -15,7 +15,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Initialize Pinecone
 pc = Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index("gujarati-news")
+index = pc.Index(os.getenv("PINECONE_INDEX_NAME"))
 
 # Initialize OpenAI
 client = OpenAI(api_key=OPENAI_API_KEY)
