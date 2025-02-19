@@ -36,7 +36,7 @@ def get_embedding(text):
     )
     return response.data[0].embedding
 
-# Function to search news in Pinecone with hybrid search
+# Function to search news in Pinecone with metadata filtering
 def search_news(query):
     # Extract date if mentioned in query
     extracted_date = extract_date(query)
@@ -44,34 +44,25 @@ def search_news(query):
     # Remove date from query before translation
     cleaned_query = re.sub(r"\b\d{2}-\d{2}-\d{4}\b", "", query).strip()
     
-    # Generate multiple query embeddings (English & Gujarati)
+    # Translate input to Gujarati
     translated_query = translate_to_gujarati(cleaned_query)
-    query_variants = [cleaned_query, translated_query]
+    
+    # Generate embeddings for the query
+    query_embedding = get_embedding(translated_query)
 
-    # Get embeddings for both queries
-    embeddings = [get_embedding(q) for q in query_variants]
-
-    # Define filter (if date is present)
-    filters = {}
+    # Search in Pinecone with date filtering
+    filter_criteria = {}
     if extracted_date:
-        filters["date"] = {"$contains": extracted_date}  # Allows partial matching
+        filter_criteria["date"] = {"$eq": extracted_date}
 
-    # Perform Pinecone search for both embeddings
-    all_results = []
-    for emb in embeddings:
-        results = index.query(
-            vector=emb, 
-            top_k=5, 
-            include_metadata=True,
-            filter=filters if filters else None  # Apply filter only if date is present
-        )
-        all_results.extend(results["matches"])
+    results = index.query(
+        vector=query_embedding, 
+        top_k=5, 
+        include_metadata=True,
+        filter=filter_criteria  # Filters by date if extracted
+    )
 
-    # Remove duplicates & sort by highest similarity
-    unique_results = {res["id"]: res for res in all_results}.values()
-    sorted_results = sorted(unique_results, key=lambda x: x["score"], reverse=True)
-
-    return sorted_results
+    return results["matches"]
 
 # Streamlit UI
 st.title("Gujarati News Search")
