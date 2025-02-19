@@ -1,7 +1,7 @@
 import os
 import streamlit as st
-import pinecone
 import openai
+from pinecone import Pinecone
 from dateutil import parser
 from deep_translator import GoogleTranslator
 from dotenv import load_dotenv
@@ -13,8 +13,8 @@ PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Initialize Pinecone
-pinecone.init(api_key=PINECONE_API_KEY, environment="gcp-starter")  # Change environment if needed
-index = pinecone.Index(PINECONE_INDEX_NAME)
+pc = Pinecone(api_key=PINECONE_API_KEY)
+index = pc.Index(PINECONE_INDEX_NAME)  # Use new Pinecone instance method
 
 # Initialize OpenAI client
 client = openai.OpenAI(api_key=OPENAI_API_KEY)
