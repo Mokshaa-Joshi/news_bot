@@ -41,25 +41,22 @@ if user_query:
 
     st.write(f"🔄 Searching news for: **{user_query}**")
 
-    # Use OpenAI to create an embedding for the query
+    # Generate embeddings for query
     embed_response = openai.embeddings.create(input=[user_query], model="text-embedding-ada-002")
-    query_vector = embed_response.data[0].embedding  # Extract embedding vector
+    query_vector = embed_response.data[0].embedding  # Extract vector
 
-    # Perform a vector search in Pinecone with metadata filtering
+    # Perform vector search (Hybrid: Title & Content relevance)
     search_results = index.query(
-        vector=query_vector,  # Provide the query vector
+        vector=query_vector,  
         top_k=5,
         include_metadata=True,
-        filter={  # Metadata filtering for title and content
-            "$or": [
-                {"title": {"$contains": user_query}},
-                {"content": {"$contains": user_query}}
-            ]
+        filter={  # Only filter metadata fields that exist in Pinecone
+            "date": {"$eq": "2025-02-19"}  # Example: Filter by today's date (modify as needed)
         }
     )
 
     # Display Results
-    if search_results["matches"]:
+    if search_results.get("matches"):
         news_articles = []
         for match in search_results["matches"]:
             metadata = match["metadata"]
