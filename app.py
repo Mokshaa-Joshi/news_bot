@@ -4,7 +4,6 @@ import streamlit as st
 from pinecone import Pinecone
 from deep_translator import GoogleTranslator
 from dotenv import load_dotenv
-import re
 
 # Load environment variables
 load_dotenv()
@@ -32,16 +31,7 @@ st.write("Enter your news query in **English or Gujarati** and get relevant news
 # User Input
 user_query = st.text_input("🔎 Search for news:")
 
-def extract_date(query):
-    """Extracts date (if any) from user input."""
-    date_pattern = r"\d{2}-\d{2}-\d{4}"  # Pattern for DD-MM-YYYY format
-    match = re.search(date_pattern, query)
-    return match.group(0) if match else None
-
 if user_query:
-    # Extract date from query (if present)
-    news_date = extract_date(user_query)
-
     # Detect language
     translated_text = GoogleTranslator(source="auto", target="en").translate(user_query)
     detected_lang = "gu" if translated_text != user_query else "en"
@@ -50,33 +40,21 @@ if user_query:
     if detected_lang == "en":
         user_query = GoogleTranslator(source="en", target="gu").translate(user_query)
 
-    # Remove the date from the query (if found) so embeddings are cleaner
-    if news_date:
-        clean_query = user_query.replace(news_date, "").strip()
-    else:
-        clean_query = user_query
-
-    st.write(f"🔄 Searching news for: **{clean_query}**")
+    st.write(f"🔄 Searching news for: **{user_query}**")
 
     # Convert query to vector using OpenAI embeddings
-    embed_response = openai.embeddings.create(input=[clean_query], model="text-embedding-ada-002")
+    embed_response = openai.embeddings.create(input=[user_query], model="text-embedding-ada-002")
     query_vector = embed_response.data[0].embedding  # Correct vector extraction
 
     # Debugging: Check vector dimension
     st.write(f"✅ Query Vector Dimension: {len(query_vector)}")
 
-    # Build filter for Pinecone search
-    filters = {}
-    if news_date:
-        filters["date"] = {"$eq": news_date}  # Exact match for the date
-
     # Search Pinecone for top 3 relevant news articles
     search_results = index.query(
         vector=query_vector,
-        top_k=3,
+        top_k=3,  # Retrieve the top 3 matches
         include_metadata=True,
-        namespace="news_data",
-        filter=filters  # Apply filter if date is found
+        namespace="news_data"  # Ensure namespace is correctly set
     )
 
     # Debugging: Check if results exist
