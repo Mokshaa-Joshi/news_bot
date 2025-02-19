@@ -18,18 +18,19 @@ from pinecone import Pinecone
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(PINECONE_INDEX_NAME)
 
-openai.api_key = OPENAI_API_KEY
+# Initialize OpenAI client
+client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 def extract_keywords(prompt):
     """Extract keywords using OpenAI API."""
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
             {"role": "system", "content": "Extract keywords from the given prompt."},
             {"role": "user", "content": prompt}
         ]
     )
-    return response["choices"][0]["message"]["content"].split(', ')
+    return response.choices[0].message.content.split(', ')
 
 def standardize_date(user_date):
     """Convert various date formats into a standard YYYY-MM-DD format."""
@@ -50,7 +51,7 @@ def search_news(prompt, user_date=None, lang="gu"):
     """Search news articles in Pinecone using keyword matching."""
     translated_prompt = GoogleTranslator(source='auto', target='en').translate(prompt)
     keywords = extract_keywords(translated_prompt)
-    query_embedding = openai.Embedding.create(input=translated_prompt, model="text-embedding-ada-002")["data"][0]["embedding"]
+    query_embedding = client.embeddings.create(input=[translated_prompt], model="text-embedding-ada-002").data[0].embedding
     
     results = index.query(vector=query_embedding, top_k=10, include_metadata=True)
     
