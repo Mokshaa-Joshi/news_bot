@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Initialize Pinecone instance
+# Initialize Pinecone
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 index_name = os.getenv("PINECONE_INDEX_NAME")
 
@@ -32,22 +32,26 @@ st.write("Enter your news query in **English or Gujarati** and get relevant news
 user_query = st.text_input("🔎 Search for news:")
 
 if user_query:
-    # Detect language by translating to itself and checking changes
+    # Detect language and translate if needed
     translated_text = GoogleTranslator(source="auto", target="en").translate(user_query)
     detected_lang = "gu" if translated_text != user_query else "en"
 
-    # Translate to Gujarati if input is English
     if detected_lang == "en":
         user_query = GoogleTranslator(source="en", target="gu").translate(user_query)
 
     st.write(f"🔄 Searching news for: **{user_query}**")
 
-    # Convert query to vector using OpenAI embeddings (Updated API)
-    embed_response = openai.embeddings.create(input=[user_query], model="text-embedding-ada-002")
-    query_vector = embed_response.data[0].embedding  # New API format
-
-    # Search Pinecone for top 3 relevant news articles
-    search_results = index.query(vector=query_vector, top_k=3, include_metadata=True)
+    # Keyword Search in Pinecone (Filtering by Title and Content)
+    search_results = index.query(
+        filter={
+            "$or": [
+                {"title": {"$contains": user_query}},
+                {"content": {"$contains": user_query}}
+            ]
+        },
+        top_k=5,
+        include_metadata=True
+    )
 
     # Display Results
     if search_results["matches"]:
@@ -56,7 +60,7 @@ if user_query:
             metadata = match["metadata"]
             news_articles.append(f"**{metadata['title']}**\n📅 {metadata['date']}\n🔗 [Read More]({metadata['link']})\n\n{metadata['content'][:300]}...")
 
-        # Format response using OpenAI (Updated API)
+        # Format response using OpenAI
         response = openai.chat.completions.create(
             model="gpt-4",
             messages=[
