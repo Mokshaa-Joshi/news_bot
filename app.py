@@ -1,15 +1,14 @@
 import os
+import streamlit as st
 import pinecone
 import openai
 import datetime
 from deep_translator import GoogleTranslator
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
-
-# Load API keys
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_ENV = os.getenv("PINECONE_ENV")
 PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
@@ -47,7 +46,7 @@ def standardize_date(user_date):
     
     return parsed_date.strftime("%Y-%m-%d") if parsed_date else None
 
-def search_news(prompt, user_date=None, lang="gu"):
+def search_news(prompt, user_date=None):
     """Search news articles in Pinecone using keyword matching."""
     translated_prompt = GoogleTranslator(source='auto', target='en').translate(prompt)
     keywords = extract_keywords(translated_prompt)
@@ -55,8 +54,7 @@ def search_news(prompt, user_date=None, lang="gu"):
     
     results = index.query(vector=query_embedding, top_k=10, include_metadata=True)
     
-    if user_date:
-        standardized_date = standardize_date(user_date)
+    standardized_date = standardize_date(user_date) if user_date else None
     
     for match in results["matches"]:
         metadata = match["metadata"]
@@ -68,10 +66,26 @@ def search_news(prompt, user_date=None, lang="gu"):
                     "link": metadata["link"],
                     "content": metadata["content"]
                 }
-    return "No matching news found."
+    return None
 
-# Example usage
-user_prompt = "ગુજરાતમાં ભારે વરસાદ"
-user_date = "15-02-2024"
-result = search_news(user_prompt, user_date)
-print(result)
+# Streamlit UI
+st.set_page_config(page_title="Gujarati News Bot", layout="wide")
+st.title("📰 Gujarati News Bot")
+
+# Input fields
+query = st.text_input("Enter your query in Gujarati:")
+date_input = st.text_input("Enter date (optional, any format):")
+
+if st.button("Search News"):
+    if query:
+        result = search_news(query, date_input)
+        if result:
+            st.subheader(result["title"])
+            st.write(f"📅 **Date:** {result["date"]}")
+            st.write(f"🔗 [Read more]({result['link']})")
+            st.write("---")
+            st.write(result["content"])
+        else:
+            st.warning("No matching news found.")
+    else:
+        st.error("Please enter a query.")
