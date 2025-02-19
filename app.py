@@ -9,8 +9,8 @@ load_dotenv()
 
 # MongoDB connection
 MONGO_URI = os.getenv("MONGO_URI")
-DB_NAME = "news_db"
-COLLECTION_NAME = "news"
+DB_NAME = "news_data"
+COLLECTION_NAME = "dd_news_articles"
 
 client = MongoClient(MONGO_URI)
 db = client[DB_NAME]
