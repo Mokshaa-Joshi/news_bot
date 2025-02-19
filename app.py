@@ -42,9 +42,9 @@ if user_query:
 
     st.write(f"🔄 Searching news for: **{user_query}**")
 
-    # Convert query to vector using OpenAI embeddings
-    embed_response = openai.Embedding.create(input=user_query, model="text-embedding-ada-002")
-    query_vector = embed_response["data"][0]["embedding"]
+    # Convert query to vector using OpenAI embeddings (Updated API)
+    embed_response = openai.embeddings.create(input=[user_query], model="text-embedding-ada-002")
+    query_vector = embed_response.data[0].embedding  # New API format
 
     # Search Pinecone for top 3 relevant news articles
     search_results = index.query(vector=query_vector, top_k=3, include_metadata=True)
