@@ -1,72 +1,54 @@
 import streamlit as st
+from pymongo import MongoClient
+from dotenv import load_dotenv
 import os
 import re
-from datetime import datetime
-from dotenv import load_dotenv
-from openai import OpenAI
-from deep_translator import GoogleTranslator
-from pinecone import Pinecone
 
 # Load environment variables
 load_dotenv()
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_ENV = os.getenv("PINECONE_ENV")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Initialize Pinecone
-pc = Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index(os.getenv("PINECONE_INDEX_NAME"))
+# MongoDB connection
+MONGO_URI = os.getenv("MONGO_URI")
+DB_NAME = "news_db"
+COLLECTION_NAME = "news"
 
-# Initialize OpenAI
-client = OpenAI(api_key=OPENAI_API_KEY)
+client = MongoClient(MONGO_URI)
+db = client[DB_NAME]
+collection = db[COLLECTION_NAME]
 
-def extract_keywords(prompt):
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "system", "content": "Extract important keywords from the user's query."},
-                  {"role": "user", "content": prompt}],
-        max_tokens=10
-    )
-    return response.choices[0].message.content.strip()
+# Streamlit UI
+st.title("Gujarati News Search Bot 📰")
+st.write("Enter a keyword and date to find relevant news.")
 
+# User input
+query = st.text_input("Search News (e.g., 'ISRO on 29-01-2025')")
 
-def parse_date(user_date):
-    formats = ["%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y", "%m-%d-%Y"]
-    for fmt in formats:
-        try:
-            return datetime.strptime(user_date, fmt).strftime("%Y-%m-%d")
-        except ValueError:
-            continue
-    return None
+if st.button("Search"):
+    if query:
+        # Extract date from the query if present
+        date_match = re.search(r"\d{2}-\d{2}-\d{4}", query)
+        date_filter = date_match.group(0) if date_match else None
 
-def search_news(query):
-    translated_query = GoogleTranslator(source='auto', target='gu').translate(query)
-    keywords = extract_keywords(translated_query)
-    
-    date_match = re.search(r'\d{1,2}[-/]\d{1,2}[-/]\d{4}', query)
-    date_formatted = parse_date(date_match.group()) if date_match else None
-    
-    results = index.query(keywords, top_k=5, include_metadata=True)
-    for result in results["matches"]:
-        record = result["metadata"]
-        if keywords in record["title"] and (date_formatted is None or date_formatted == record["date"]):
-            return record
-    return None
+        # Convert query to regex for better matching
+        regex_pattern = re.compile(query, re.IGNORECASE)
 
-def main():
-    st.title("Gujarati News Bot 📰")
-    user_query = st.text_input("Enter your news query:")
-    
-    if st.button("Search") and user_query:
-        result = search_news(user_query)
-        
-        if result:
-            st.subheader(result["title"])
-            st.write(f"**Date:** {result['date']}")
-            st.write(f"[Read more]({result['link']})")
-            st.write(result["content"])
+        # Build MongoDB filter
+        mongo_query = {"$or": [{"title": regex_pattern}, {"content": regex_pattern}]}
+        if date_filter:
+            mongo_query["date"] = {"$regex": date_filter}
+
+        # Fetch results
+        results = collection.find(mongo_query)
+
+        # Display results
+        if results:
+            for news in results:
+                st.subheader(news["title"])
+                st.write(f"📅 **Date:** {news['date']}")
+                st.write(f"🔗 [Read More]({news['link']})")
+                st.write(f"📰 **Content:**\n {news['content']}")
+                st.markdown("---")
         else:
-            st.error("No exact match found. Try refining your query.")
-
-if __name__ == "__main__":
-    main()
+            st.write("❌ No news found.")
+    else:
+        st.warning("Please enter a search query.")
