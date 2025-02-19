@@ -21,12 +21,14 @@ index = pc.Index(os.getenv("PINECONE_INDEX_NAME"))
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 def extract_keywords(prompt):
-    response = client.completions.create(
+    response = client.chat.completions.create(
         model="gpt-3.5-turbo",
-        prompt=f"Extract important keywords from this query: {prompt}",
+        messages=[{"role": "system", "content": "Extract important keywords from the user's query."},
+                  {"role": "user", "content": prompt}],
         max_tokens=10
     )
-    return response.choices[0].text.strip()
+    return response.choices[0].message.content.strip()
+
 
 def parse_date(user_date):
     formats = ["%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y", "%m-%d-%Y"]
