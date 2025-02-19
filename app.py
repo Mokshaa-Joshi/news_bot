@@ -1,16 +1,24 @@
 import os
-import pinecone
 import openai
 import streamlit as st
+from pinecone import Pinecone
 from deep_translator import GoogleTranslator
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-# Initialize Pinecone
-pinecone.init(api_key=os.getenv("PINECONE_API_KEY"), environment=os.getenv("PINECONE_ENV"))
-index = pinecone.Index(os.getenv("PINECONE_INDEX_NAME"))
+# Initialize Pinecone instance
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+
+# Get index name from environment variables
+index_name = os.getenv("PINECONE_INDEX_NAME")
+
+# Check if the index exists
+if index_name not in pc.list_indexes().names():
+    st.error(f"Index '{index_name}' not found in Pinecone. Please check your configuration.")
+else:
+    index = pc.Index(index_name)
 
 # OpenAI API Key
 openai.api_key = os.getenv("OPENAI_API_KEY")
