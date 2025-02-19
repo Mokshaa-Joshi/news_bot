@@ -10,15 +10,14 @@ load_dotenv()
 
 # Initialize Pinecone instance
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-
-# Get index name from environment variables
 index_name = os.getenv("PINECONE_INDEX_NAME")
 
-# Check if the index exists
+# Check if index exists
 if index_name not in pc.list_indexes().names():
     st.error(f"Index '{index_name}' not found in Pinecone. Please check your configuration.")
-else:
-    index = pc.Index(index_name)
+    st.stop()  # Stop execution if index is missing
+
+index = pc.Index(index_name)
 
 # OpenAI API Key
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -33,9 +32,12 @@ st.write("Enter your news query in **English or Gujarati** and get relevant news
 user_query = st.text_input("🔎 Search for news:")
 
 if user_query:
-    # Detect and Translate Input to Gujarati if it's in English
-    detected_lang = GoogleTranslator(source="auto", target="gu").detect(user_query)
-    if detected_lang != "gu":
+    # Detect language by translating to itself and checking changes
+    translated_text = GoogleTranslator(source="auto", target="en").translate(user_query)
+    detected_lang = "gu" if translated_text != user_query else "en"
+
+    # Translate to Gujarati if input is English
+    if detected_lang == "en":
         user_query = GoogleTranslator(source="en", target="gu").translate(user_query)
 
     st.write(f"🔄 Searching news for: **{user_query}**")
