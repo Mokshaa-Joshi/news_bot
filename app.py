@@ -13,8 +13,8 @@ PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Initialize Pinecone
-pc = pinecone.Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index(PINECONE_INDEX_NAME)
+pinecone.init(api_key=PINECONE_API_KEY, environment="gcp-starter")  # Change environment if needed
+index = pinecone.Index(PINECONE_INDEX_NAME)
 
 # Initialize OpenAI client
 client = openai.OpenAI(api_key=OPENAI_API_KEY)
@@ -39,31 +39,39 @@ def standardize_date(user_date):
         return None
 
 def search_news(prompt, user_date=None):
-    """Search exact matching news articles in Pinecone."""
+    """Search exact matching news articles in Pinecone using metadata filtering."""
     translated_prompt = GoogleTranslator(source="auto", target="en").translate(prompt)
     keywords = extract_keywords(translated_prompt)
 
-    # Query Pinecone for all stored records
-    results = index.query(vector=None, filter={}, top_k=100, include_metadata=True)
-
+    # Standardize the date format
     standardized_date = standardize_date(user_date) if user_date else None
+
+    # Construct metadata filter query
+    metadata_filter = {"$and": []}
+    
+    for keyword in keywords:
+        metadata_filter["$and"].append({
+            "$or": [
+                {"title": {"$contains": keyword}},
+                {"content": {"$contains": keyword}}
+            ]
+        })
+    
+    if standardized_date:
+        metadata_filter["$and"].append({"date": standardized_date})
+
+    # Query Pinecone with metadata filter
+    results = index.query(filter=metadata_filter, top_k=10, include_metadata=True)
 
     for match in results["matches"]:
         metadata = match["metadata"]
-        title = metadata["title"].lower()
-        content = metadata["content"].lower()
-        record_date = metadata["date"]
-
-        # Check if keywords match in title or content
-        if all(keyword in title or keyword in content for keyword in keywords):
-            # Ensure exact date match if provided
-            if not user_date or record_date == standardized_date:
-                return {
-                    "title": metadata["title"],
-                    "date": metadata["date"],
-                    "link": metadata["link"],
-                    "content": metadata["content"],
-                }
+        return {
+            "title": metadata["title"],
+            "date": metadata["date"],
+            "link": metadata["link"],
+            "content": metadata["content"],
+        }
+    
     return None
 
 # Streamlit UI
