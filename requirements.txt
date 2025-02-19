@@ -2,3 +2,4 @@ streamlit
 openai
 pinecone-client
 deep-translator
+python-dotenv
