@@ -10,9 +10,12 @@ load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+# Initialize OpenAI client
+client = openai.OpenAI(api_key=OPENAI_API_KEY)
+
 # Initialize Pinecone
 pc = Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index("newsbot")
+index = pc.Index("news-index")
 
 # Function to translate input to Gujarati if needed
 def translate_to_gujarati(text):
@@ -20,12 +23,11 @@ def translate_to_gujarati(text):
 
 # Function to generate query embeddings using OpenAI
 def get_embedding(text):
-    response = openai.Embedding.create(
+    response = client.embeddings.create(
         input=text,
-        model="text-embedding-ada-002",
-        api_key=OPENAI_API_KEY
+        model="text-embedding-ada-002"
     )
-    return response["data"][0]["embedding"]
+    return response.data[0].embedding
 
 # Function to search news in Pinecone
 def search_news(query):
