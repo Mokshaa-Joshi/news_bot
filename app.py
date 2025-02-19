@@ -22,12 +22,6 @@ index = pc.Index("newsbot")
 def translate_to_gujarati(text):
     return GoogleTranslator(source='auto', target='gu').translate(text)
 
-# Function to extract date from query
-def extract_date(query):
-    date_pattern = r"\b\d{2}-\d{2}-\d{4}\b"
-    match = re.search(date_pattern, query)
-    return match.group() if match else None
-
 # Function to generate query embeddings using OpenAI
 def get_embedding(text):
     response = client.embeddings.create(
@@ -36,33 +30,30 @@ def get_embedding(text):
     )
     return response.data[0].embedding
 
-# Function to search news in Pinecone with metadata filtering
-def search_news(query):
-    # Extract date if mentioned in query
-    extracted_date = extract_date(query)
-    
-    # Remove date from query before translation
-    cleaned_query = re.sub(r"\b\d{2}-\d{2}-\d{4}\b", "", query).strip()
-    
-    # Translate input to Gujarati
-    translated_query = translate_to_gujarati(cleaned_query)
-    
-    # Generate embeddings for the query
-    query_embedding = get_embedding(translated_query)
-
-    # Search in Pinecone with date filtering
-    filter_criteria = {}
-    if extracted_date:
-        filter_criteria["date"] = {"$eq": extracted_date}
-
+# Function to check for an exact match using metadata filtering
+def exact_match_search(query):
     results = index.query(
-        vector=query_embedding, 
         top_k=5, 
         include_metadata=True,
-        filter=filter_criteria  # Filters by date if extracted
+        filter={"title": {"$regex": query}}  # Checks if the title contains the query
     )
-
     return results["matches"]
+
+# Function to search news using vector search (fallback)
+def semantic_search(query):
+    query_embedding = get_embedding(query)
+    results = index.query(vector=query_embedding, top_k=5, include_metadata=True)
+    return results["matches"]
+
+# Function to perform hybrid search
+def search_news(query):
+    # Try exact match first
+    exact_results = exact_match_search(query)
+    if exact_results:
+        return exact_results  # If found, return exact matches
+    
+    # If no exact match, fall back to vector search
+    return semantic_search(query)
 
 # Streamlit UI
 st.title("Gujarati News Search")
@@ -71,8 +62,11 @@ user_query = st.text_input("Enter your query (English or Gujarati):")
 
 if st.button("Search"):
     if user_query:
-        # Search news in Pinecone
-        results = search_news(user_query)
+        # Translate input to Gujarati
+        translated_query = translate_to_gujarati(user_query)
+        
+        # Search news in Pinecone (Hybrid Approach)
+        results = search_news(translated_query)
         
         # Display results
         if results:
