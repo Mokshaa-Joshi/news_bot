@@ -56,14 +56,14 @@ if user_query:
             metadata = match["metadata"]
             news_articles.append(f"**{metadata['title']}**\n📅 {metadata['date']}\n🔗 [Read More]({metadata['link']})\n\n{metadata['content'][:300]}...")
 
-        # Format response using OpenAI
-        response = openai.ChatCompletion.create(
+        # Format response using OpenAI (Updated API)
+        response = openai.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a Gujarati news bot. Format news concisely and in Gujarati."},
                 {"role": "user", "content": "\n\n".join(news_articles)}
             ]
         )
-        st.markdown(response["choices"][0]["message"]["content"])
+        st.markdown(response.choices[0].message.content)
     else:
         st.warning("❌ No relevant news found. Try a different query.")
