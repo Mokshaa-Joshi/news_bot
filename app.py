@@ -15,7 +15,7 @@ client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 # Initialize Pinecone
 pc = Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index("news-index")
+index = pc.Index("newsbot")
 
 # Function to translate input to Gujarati if needed
 def translate_to_gujarati(text):
