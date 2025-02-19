@@ -16,13 +16,6 @@ client = MongoClient(MONGO_URI)
 db = client[DB_NAME]
 collection = db[COLLECTION_NAME]
 
-# Debugging: Check connection
-try:
-    db.list_collection_names()  # This will fail if the connection is incorrect
-except Exception as e:
-    st.error(f"MongoDB Connection Error: {e}")
-    st.stop()
-
 # Streamlit UI
 st.title("Gujarati News Search Bot 📰")
 st.write("Enter a keyword and date to find relevant news.")
@@ -41,12 +34,12 @@ if st.button("Search"):
             st.write(f"🔍 Searching for news on: {date_filter}")
 
         # Convert query to regex
-        regex_pattern = re.compile(re.escape(query), re.IGNORECASE)
+        regex_pattern = re.compile(query, re.IGNORECASE)
 
-        # Build MongoDB filter
+        # Build MongoDB filter correctly
         mongo_query = {"$or": [{"title": regex_pattern}, {"content": regex_pattern}]}
         if date_filter:
-            mongo_query["date"] = {"$regex": re.escape(date_filter)}
+            mongo_query["date"] = {"$regex": date_filter}  # Fixed regex key syntax
 
         # Debugging: Show query being used
         st.write(f"🛠 MongoDB Query: {mongo_query}")
