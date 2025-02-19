@@ -1,6 +1,5 @@
 import streamlit as st
 import os
-import re
 from pinecone import Pinecone
 from deep_translator import GoogleTranslator
 import openai
@@ -30,29 +29,26 @@ def get_embedding(text):
     )
     return response.data[0].embedding
 
-# Function to search news in Pinecone using Hybrid Search (Keyword + Vector)
+# Function to search news in Pinecone (Keyword in Content + Vector Search)
 def search_news(query):
     # Translate query to Gujarati (if needed)
     translated_query = translate_to_gujarati(query)
-    
-    # Search for exact keyword match in metadata
+
+    # **1. Search for exact keyword in the content metadata**
     keyword_results = index.query(
-        vector=None,  # No vector search, only metadata filter
+        vector=None,  # No vector search, only metadata filtering
         top_k=5,
         include_metadata=True,
         filter={
-            "$or": [
-                {"title": {"$regex": translated_query}},  # Keyword match in title
-                {"content": {"$regex": translated_query}}  # Keyword match in content
-            ]
+            "content": {"$regex": translated_query}  # Look for exact match in content
         }
     )
 
-    # If keyword search finds results, return them first
+    # **If keyword search finds results, return them first**
     if keyword_results["matches"]:
         return keyword_results["matches"]
 
-    # If no exact keyword match, fall back to vector search
+    # **2. If no keyword match, fall back to vector search**
     query_embedding = get_embedding(translated_query)
     vector_results = index.query(vector=query_embedding, top_k=5, include_metadata=True)
 
@@ -65,7 +61,7 @@ user_query = st.text_input("Enter your query (English or Gujarati):")
 
 if st.button("Search"):
     if user_query:
-        # Search news using Hybrid Search
+        # Search news using Keyword + Vector Search
         results = search_news(user_query)
         
         # Display results
@@ -74,8 +70,8 @@ if st.button("Search"):
                 metadata = news["metadata"]
                 st.subheader(metadata["title"])
                 st.write(f"**Date:** {metadata['date']}")
-                st.write(metadata["content"])
                 st.write(f"**[Read More]({metadata['link']})**")
+                st.write(metadata["content"])
                 st.markdown("---")
         else:
             st.write("No news found matching your query.")
