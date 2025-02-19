@@ -1,62 +1,59 @@
 import streamlit as st
-from pymongo import MongoClient
-from dotenv import load_dotenv
+import pinecone
+import openai
 import os
-import re
+from deep_translator import GoogleTranslator
+from dotenv import load_dotenv
 
-# Load environment variables
+# Load API keys
 load_dotenv()
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# MongoDB connection
-MONGO_URI = os.getenv("MONGO_URI")
-DB_NAME = "news_data"
-COLLECTION_NAME = "dd_news_articles"
+# Initialize Pinecone
+pinecone.init(api_key=PINECONE_API_KEY, environment="gcp-starter")
+index = pinecone.Index("news-index")
 
-client = MongoClient(MONGO_URI)
-db = client[DB_NAME]
-collection = db[COLLECTION_NAME]
+# Function to translate input to Gujarati if needed
+def translate_to_gujarati(text):
+    return GoogleTranslator(source='auto', target='gu').translate(text)
+
+# Function to generate query embeddings
+def get_embedding(text):
+    response = openai.Embedding.create(
+        input=text,
+        model="text-embedding-ada-002",
+        api_key=OPENAI_API_KEY
+    )
+    return response["data"][0]["embedding"]
+
+# Search Pinecone for news articles
+def search_news(query):
+    query_embedding = get_embedding(query)
+    results = index.query(vector=query_embedding, top_k=5, include_metadata=True)
+    return results["matches"]
 
 # Streamlit UI
-st.title("Gujarati News Search Bot 📰")
-st.write("Enter a keyword and date to find relevant news.")
+st.title("Gujarati News Search")
 
-# User input
-query = st.text_input("Search News (e.g., 'ISRO on 29-01-2025')")
+user_query = st.text_input("Enter your query (English or Gujarati):")
 
 if st.button("Search"):
-    if query:
-        # Extract date from the query if present
-        date_match = re.search(r"\d{2}-\d{2}-\d{4}", query)
-        date_filter = date_match.group(0) if date_match else None
-
-        # Debugging: Show extracted date
-        if date_filter:
-            st.write(f"🔍 Searching for news on: {date_filter}")
-
-        # Convert query to regex
-        regex_pattern = re.compile(query, re.IGNORECASE)
-
-        # Build MongoDB filter correctly
-        mongo_query = {"$or": [{"title": regex_pattern}, {"content": regex_pattern}]}
-        if date_filter:
-            mongo_query["date"] = {"$regex": date_filter}  # Fixed regex key syntax
-
-        # Debugging: Show query being used
-        st.write(f"🛠 MongoDB Query: {mongo_query}")
-
-        # Fetch results
-        results = list(collection.find(mongo_query))  # Convert cursor to list
-
-        # Debugging: Check if results exist
-        if not results:
-            st.write("❌ No news found.")
-        else:
+    if user_query:
+        # Translate input if in English
+        translated_query = translate_to_gujarati(user_query)
+        
+        # Search news in Pinecone
+        results = search_news(translated_query)
+        
+        # Display results
+        if results:
             for news in results:
-                st.subheader(news["title"])
-                st.write(f"🆔 **ID:** {news['_id']}")
-                st.write(f"📅 **Date:** {news['date']}")
-                st.write(f"🔗 [Read More]({news['link']})")
-                st.write(f"📰 **Content:**\n {news['content']}")
+                metadata = news["metadata"]
+                st.subheader(metadata["title"])
+                st.write(f"**Date:** {metadata['date']}")
+                st.write(f"**[Read More]({metadata['link']})**")
+                st.write(metadata["content"])
                 st.markdown("---")
-    else:
-        st.warning("Please enter a search query.")
+        else:
+            st.write("No news found matching your query.")
