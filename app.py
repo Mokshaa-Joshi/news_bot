@@ -15,7 +15,7 @@ index_name = os.getenv("PINECONE_INDEX_NAME")
 # Check if index exists
 if index_name not in pc.list_indexes().names():
     st.error(f"Index '{index_name}' not found in Pinecone. Please check your configuration.")
-    st.stop()  # Stop execution if index is missing
+    st.stop()
 
 index = pc.Index(index_name)
 
@@ -41,16 +41,21 @@ if user_query:
 
     st.write(f"🔄 Searching news for: **{user_query}**")
 
-    # Keyword Search in Pinecone (Filtering by Title and Content)
+    # Use OpenAI to create an embedding for the query
+    embed_response = openai.embeddings.create(input=[user_query], model="text-embedding-ada-002")
+    query_vector = embed_response.data[0].embedding  # Extract embedding vector
+
+    # Perform a vector search in Pinecone with metadata filtering
     search_results = index.query(
-        filter={
+        vector=query_vector,  # Provide the query vector
+        top_k=5,
+        include_metadata=True,
+        filter={  # Metadata filtering for title and content
             "$or": [
                 {"title": {"$contains": user_query}},
                 {"content": {"$contains": user_query}}
             ]
-        },
-        top_k=5,
-        include_metadata=True
+        }
     )
 
     # Display Results
