@@ -1,8 +1,8 @@
 import streamlit as st
-import pinecone
-import openai
 import os
+from pinecone import Pinecone
 from deep_translator import GoogleTranslator
+import openai
 from dotenv import load_dotenv
 
 # Load API keys
@@ -11,14 +11,14 @@ PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Initialize Pinecone
-pinecone.init(api_key=PINECONE_API_KEY, environment="gcp-starter")
-index = pinecone.Index("news-index")
+pc = Pinecone(api_key=PINECONE_API_KEY)
+index = pc.Index("newsbot")
 
 # Function to translate input to Gujarati if needed
 def translate_to_gujarati(text):
     return GoogleTranslator(source='auto', target='gu').translate(text)
 
-# Function to generate query embeddings
+# Function to generate query embeddings using OpenAI
 def get_embedding(text):
     response = openai.Embedding.create(
         input=text,
@@ -27,7 +27,7 @@ def get_embedding(text):
     )
     return response["data"][0]["embedding"]
 
-# Search Pinecone for news articles
+# Function to search news in Pinecone
 def search_news(query):
     query_embedding = get_embedding(query)
     results = index.query(vector=query_embedding, top_k=5, include_metadata=True)
