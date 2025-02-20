@@ -3,30 +3,35 @@ import os
 import re
 import time
 from pinecone import Pinecone
-from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint
+import openai
 from dotenv import load_dotenv
+from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint
 from huggingface_hub import login
 
 # Load API keys
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
-# Initialize Hugging Face Translation Model
+# Initialize OpenAI client (for embeddings)
+client = openai.OpenAI(api_key=OPENAI_API_KEY)
+
+# Initialize Pinecone
+pc = Pinecone(api_key=PINECONE_API_KEY)
+index = pc.Index("newsbot")
+
+# Login to Hugging Face
+login(HUGGINGFACE_API_KEY)
+
+# Initialize Mistral Mixtral-8x7B for translation
 repo_id = "mistralai/Mixtral-8x7B-Instruct-v0.1"
-llm = HuggingFaceEndpoint(
+translator = HuggingFaceEndpoint(
     repo_id=repo_id,
     temperature=0.8,
     top_k=50,
     huggingfacehub_api_token=HUGGINGFACE_API_KEY
 )
-
-# Initialize Hugging Face Embeddings
-hf_embeddings = HuggingFaceEmbeddings()
-
-# Initialize Pinecone
-pc = Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index("newsbot")
 
 STOPWORDS = {"news", "give", "me", "about", "on", "the", "is", "of", "for", "and", "with", "to", "in", "a"}
 
@@ -36,18 +41,19 @@ def extract_keywords(text):
     return " ".join(keywords)
 
 def translate_to_gujarati(text):
-    """ Translates text to Gujarati using Mixtral-8x7B (Hugging Face) """
+    """ Translates text to Gujarati using Mixtral-8x7B """
     try:
-        prompt = f"Translate this English text to Gujarati: {text}"
-        response = llm.invoke(prompt)
+        prompt = f"Translate the following text to Gujarati:\n\n{text}"
+        response = translator.invoke(prompt)
         return response.strip()
     except Exception as e:
         st.error(f"Translation error: {e}")
     return text  # Fallback to original text
 
 def get_embedding(text):
-    """ Generate text embeddings using Hugging Face """
-    return hf_embeddings.embed_query(text)
+    """ Generate text embeddings using OpenAI """
+    response = client.embeddings.create(input=text, model="text-embedding-ada-002")
+    return response.data[0].embedding
 
 def highlight_keywords(text, keywords):
     """ Highlights keywords in text using HTML markup """
