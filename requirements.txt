@@ -4,3 +4,4 @@ pinecone-client
 deep-translator
 python-dotenv
 pymongo
+spacy
