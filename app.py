@@ -1,7 +1,6 @@
 import streamlit as st
 import os
 import re
-import spacy
 from pinecone import Pinecone
 from deep_translator import GoogleTranslator
 import openai
@@ -19,23 +18,14 @@ client = openai.OpenAI(api_key=OPENAI_API_KEY)
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index("newsbot")
 
-# Load spaCy NLP model
-nlp = spacy.load("en_core_web_sm")
+# Common words to ignore in keyword extraction
+STOPWORDS = {"news", "about", "on", "the", "is", "of", "for", "and", "with", "to", "in", "a"}
 
-# Function to extract important keywords (NER + noun phrases)
+# Function to extract important keywords from user query
 def extract_keywords(text):
-    doc = nlp(text)
-    keywords = set()
-
-    # Extract Named Entities (e.g., ISRO, Prime Minister)
-    for ent in doc.ents:
-        keywords.add(ent.text)
-
-    # Extract Noun Phrases (e.g., "space agency", "government policy")
-    for chunk in doc.noun_chunks:
-        keywords.add(chunk.text)
-
-    return list(keywords)
+    words = text.split()
+    keywords = [word for word in words if word.lower() not in STOPWORDS]
+    return " ".join(keywords)  # Join back as a phrase
 
 # Function to translate input to Gujarati if needed
 def translate_to_gujarati(text):
@@ -56,8 +46,11 @@ def highlight_keywords(text, keywords):
     if not text or not keywords:
         return text
     
+    # Split query into words for better highlighting
+    words = keywords.split()
+    
     # Create regex pattern for multiple words
-    pattern = re.compile(r'\b(' + '|'.join(map(re.escape, keywords)) + r')\b', re.IGNORECASE)
+    pattern = re.compile(r'\b(' + '|'.join(map(re.escape, words)) + r')\b', re.IGNORECASE)
     
     # Highlight words
     highlighted_text = pattern.sub(r'<mark style="background-color: yellow;">\1</mark>', text)
@@ -66,16 +59,16 @@ def highlight_keywords(text, keywords):
 
 # Function to search news using keyword filtering and vector search
 def search_news(query):
-    # Extract important keywords
-    important_keywords = extract_keywords(query)
+    # Extract important keywords (remove stopwords)
+    cleaned_query = extract_keywords(query)
     
-    # Translate keywords to Gujarati
-    translated_keywords = [translate_to_gujarati(word) for word in important_keywords]
+    # Translate query to Gujarati
+    translated_query = translate_to_gujarati(cleaned_query)
 
-    # Use both English and Gujarati keywords
-    possible_queries = important_keywords + translated_keywords
+    # Use both English and Gujarati queries
+    possible_queries = [cleaned_query, translated_query]
     all_results = []
-
+    
     for q in possible_queries:
         try:
             # Fetch results from Pinecone
@@ -92,13 +85,13 @@ def search_news(query):
 
     # If keyword search has results, return them
     if all_results:
-        return all_results, important_keywords
+        return all_results, translated_query
 
     # If no keyword match, fall back to vector search
-    query_embedding = get_embedding(" ".join(important_keywords))  # Use extracted keywords
+    query_embedding = get_embedding(cleaned_query)  # Use cleaned English query for embeddings
     vector_results = index.query(vector=query_embedding, top_k=5, include_metadata=True)
 
-    return vector_results["matches"], important_keywords
+    return vector_results["matches"], translated_query
 
 # Streamlit UI
 st.title("Gujarati News Search 📰")
@@ -107,17 +100,17 @@ user_query = st.text_input("Enter your query (English or Gujarati):")
 
 if st.button("Search"):
     if user_query:
-        # Search news using extracted keywords
-        results, extracted_keywords = search_news(user_query)
-
+        # Search news using Keyword + Vector Search
+        results, translated_query = search_news(user_query)
+        
         # Display results
         if results:
             for news in results:
                 metadata = news["metadata"]
                 
-                # Highlight extracted keywords in title & content
-                highlighted_title = highlight_keywords(metadata["title"], extracted_keywords)
-                highlighted_content = highlight_keywords(metadata["content"], extracted_keywords)
+                # Highlight translated query in title & content
+                highlighted_title = highlight_keywords(metadata["title"], translated_query)
+                highlighted_content = highlight_keywords(metadata["content"], translated_query)
 
                 st.markdown(f"### {highlighted_title}", unsafe_allow_html=True)
                 st.write(f"**Date:** {metadata['date']}")
