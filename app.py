@@ -10,43 +10,42 @@ from deep_translator import GoogleTranslator
 import openai
 from dotenv import load_dotenv
 
-# Ensure NLTK resources are available
-def ensure_nltk_resources():
-    resources = ["punkt", "stopwords", "averaged_perceptron_tagger"]
-    for res in resources:
-        nltk.download(res)
+# 🔹 Ensure NLTK resources are available (fix for Streamlit Cloud)
+nltk_resources = ["punkt", "stopwords", "averaged_perceptron_tagger"]
+for resource in nltk_resources:
+    try:
+        nltk.data.find(f"tokenizers/{resource}")
+    except LookupError:
+        nltk.download(resource)
 
-ensure_nltk_resources()  # Download missing resources if needed
-
-# Load API keys
+# 🔹 Load API keys securely
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Initialize OpenAI client
+# 🔹 Initialize OpenAI client
 client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
-# Initialize Pinecone
+# 🔹 Initialize Pinecone
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index("newsbot")
 
-# Function to extract important keywords using NLTK
+# 🔹 Extract important keywords using NLP
 def extract_keywords(text):
-    words = word_tokenize(text)  # Tokenize input text
+    words = word_tokenize(text)
     words = [word for word in words if word.lower() not in stopwords.words("english")]  # Remove stopwords
     
-    # Extract only nouns (proper nouns & common nouns)
+    # Extract only proper nouns and nouns (important keywords)
     keywords = [word for word, tag in pos_tag(words) if tag in ["NN", "NNS", "NNP", "NNPS"]]
-    
-    return keywords  # Return list of extracted keywords
+    return keywords  # List of extracted keywords
 
-# Function to translate input to Gujarati if needed
+# 🔹 Translate input to Gujarati if needed
 def translate_to_gujarati(text):
     if re.search(r'[a-zA-Z]', text):  # If input contains English letters
         return GoogleTranslator(source='en', target='gu').translate(text)
     return text  # Already in Gujarati
 
-# Function to generate query embeddings using OpenAI
+# 🔹 Generate query embeddings using OpenAI
 def get_embedding(text):
     response = client.embeddings.create(
         input=text,
@@ -54,7 +53,7 @@ def get_embedding(text):
     )
     return response.data[0].embedding
 
-# Function to highlight multiple keywords in text
+# 🔹 Highlight multiple keywords in text
 def highlight_keywords(text, keywords):
     if not text or not keywords:
         return text
@@ -67,7 +66,7 @@ def highlight_keywords(text, keywords):
     
     return highlighted_text
 
-# Function to search news using keyword filtering and vector search
+# 🔹 Search news using keyword filtering and vector search
 def search_news(query):
     # Extract important keywords from query
     keywords = extract_keywords(query)
@@ -105,7 +104,7 @@ def search_news(query):
 
     return vector_results["matches"], keywords
 
-# Streamlit UI
+# 🔹 Streamlit UI
 st.title("Gujarati News Search 📰")
 
 user_query = st.text_input("Enter your query (English or Gujarati):")
