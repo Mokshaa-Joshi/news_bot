@@ -43,7 +43,7 @@ def highlight_keywords(text, keywords):
         return text
     words = keywords.split()
     pattern = re.compile(r'\b(' + '|'.join(map(re.escape, words)) + r')\b', re.IGNORECASE)
-    return pattern.sub(r'<mark style="background-color: yellow;">\1</mark>', text)
+    return pattern.sub(r'<mark style="background-color: yellow; color: black;">\1</mark>', text)
 
 def search_news(query):
     cleaned_query = extract_keywords(query)
@@ -60,20 +60,25 @@ st.markdown(
         body {
             font-family: 'Arial', sans-serif;
             background-color: #f0f2f5;
+            color: black;
         }
         .stTextInput > div > div > input {
             border: 2px solid #4CAF50;
             padding: 12px;
             border-radius: 8px;
+            color: black;
         }
         .stButton > button {
             background-color: #4CAF50;
-            color: white;
+            color: white !important;
             padding: 12px;
             border-radius: 5px;
             border: none;
             width: 100%;
             font-size: 16px;
+        }
+        .stButton > button:hover {
+            background-color: #45a049;
         }
         .news-card {
             background-color: #d9e2ec;
@@ -81,6 +86,7 @@ st.markdown(
             border-radius: 8px;
             box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
             margin-bottom: 15px;
+            color: black;
         }
     </style>
     """,
