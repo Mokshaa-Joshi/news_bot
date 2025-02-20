@@ -1,11 +1,19 @@
 import streamlit as st
 import os
 import re
-import spacy
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.tag import pos_tag
 from pinecone import Pinecone
 from deep_translator import GoogleTranslator
 import openai
 from dotenv import load_dotenv
+
+# Download required NLTK data
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('averaged_perceptron_tagger')
 
 # Load API keys
 load_dotenv()
@@ -19,13 +27,13 @@ client = openai.OpenAI(api_key=OPENAI_API_KEY)
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index("newsbot")
 
-# Load NLP Model (spaCy)
-nlp = spacy.load("en_core_web_sm")
-
-# Function to extract important keywords from query
+# Function to extract important keywords using NLTK
 def extract_keywords(text):
-    doc = nlp(text)
-    keywords = [token.text for token in doc if token.pos_ in ["PROPN", "NOUN"] and not token.is_stop]
+    words = word_tokenize(text)
+    words = [word for word in words if word.lower() not in stopwords.words("english")]  # Remove stopwords
+    
+    # Extract only proper nouns and nouns
+    keywords = [word for word, tag in pos_tag(words) if tag in ["NN", "NNS", "NNP", "NNPS"]]
     return keywords  # List of extracted keywords
 
 # Function to translate input to Gujarati if needed
