@@ -91,7 +91,7 @@ st.markdown(
         .read-more-button {
             display: inline-block;
             padding: 5px 10px;
-            background-color: #4CAF50;
+            background-color: ##333333;
             color: white;
             text-decoration: none;
             border-radius: 5px;
