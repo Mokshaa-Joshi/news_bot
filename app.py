@@ -10,13 +10,17 @@ from deep_translator import GoogleTranslator
 import openai
 from dotenv import load_dotenv
 
-# 🔹 Fix: Manually Download NLTK Resources for Streamlit Cloud
+# ✅ Fix: Use a local directory for NLTK data (No permission error)
+NLTK_PATH = "./nltk_data"
+if not os.path.exists(NLTK_PATH):
+    os.makedirs(NLTK_PATH, exist_ok=True)  # Create if not exists
+
+nltk.data.path.append(NLTK_PATH)  # Tell NLTK to use this path
+
+# 🔹 Download NLTK resources locally
 nltk_resources = ["punkt", "stopwords", "averaged_perceptron_tagger"]
 for resource in nltk_resources:
-    nltk.download(resource, download_dir="/usr/local/nltk_data")  # Force specific directory
-
-# Set NLTK data path (Fix for Streamlit Cloud)
-nltk.data.path.append("/usr/local/nltk_data")
+    nltk.download(resource, download_dir=NLTK_PATH)
 
 # 🔹 Load API keys securely
 load_dotenv()
