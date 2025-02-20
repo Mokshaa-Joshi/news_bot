@@ -88,6 +88,18 @@ st.markdown(
             margin-bottom: 15px;
             color: black;
         }
+        .read-more-button {
+            display: inline-block;
+            padding: 5px 10px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .read-more-button:hover {
+            background-color: #45a049;
+        }
     </style>
     """,
     unsafe_allow_html=True
@@ -118,7 +130,7 @@ if st.button("Search News"):
                     <h3>{highlighted_title}</h3>
                     <p><strong>📅 Date:</strong> {metadata['date']}</p>
                     <p>{highlighted_content}</p>
-                    <p><a href="{metadata['link']}" target="_blank">🔗 Read More</a></p>
+                    <p><a href="{metadata['link']}" target="_blank" class="read-more-button">🔗 Read More</a></p>
                 </div>
                 """, unsafe_allow_html=True)
         else:
