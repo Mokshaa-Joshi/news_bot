@@ -3,7 +3,6 @@ import os
 import re
 import time
 from pinecone import Pinecone
-from deep_translator import GoogleTranslator
 import openai
 from dotenv import load_dotenv
 
@@ -27,18 +26,27 @@ def extract_keywords(text):
     return " ".join(keywords)
 
 def translate_to_gujarati(text):
+    """ Translates text to Gujarati using OpenAI GPT-4 Turbo. """
     try:
-        if re.search(r'[a-zA-Z]', text):
-            return GoogleTranslator(source='en', target='gu').translate(text)
+        response = client.chat.completions.create(
+            model="gpt-4-turbo",
+            messages=[
+                {"role": "system", "content": "Translate the following text to Gujarati."},
+                {"role": "user", "content": text}
+            ]
+        )
+        return response.choices[0].message.content.strip()
     except Exception as e:
         st.error(f"Translation error: {e}")
-    return text
+    return text  # Fallback to original text
 
 def get_embedding(text):
+    """ Generate text embeddings using OpenAI """
     response = client.embeddings.create(input=text, model="text-embedding-ada-002")
     return response.data[0].embedding
 
 def highlight_keywords(text, keywords):
+    """ Highlights keywords in text using HTML markup """
     if not text or not keywords:
         return text
     words = keywords.split()
@@ -46,12 +54,14 @@ def highlight_keywords(text, keywords):
     return pattern.sub(r'<mark style="background-color: yellow; color: black;">\1</mark>', text)
 
 def search_news(query):
+    """ Searches news articles using Pinecone vector search """
     cleaned_query = extract_keywords(query)
     translated_query = translate_to_gujarati(cleaned_query)
     query_embedding = get_embedding(cleaned_query)
     vector_results = index.query(vector=query_embedding, top_k=5, include_metadata=True)
     return vector_results["matches"], cleaned_query, translated_query
 
+# Streamlit UI Configuration
 st.set_page_config(page_title="Gujarati News Bot", page_icon="📰", layout="centered")
 
 st.markdown(
