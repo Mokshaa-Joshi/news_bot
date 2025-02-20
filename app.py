@@ -5,14 +5,12 @@ import time
 from pinecone import Pinecone
 import openai
 from dotenv import load_dotenv
-from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint
-from huggingface_hub import login
+from deep_translator import GoogleTranslator
 
 # Load API keys
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
 # Initialize OpenAI client (for embeddings)
 client = openai.OpenAI(api_key=OPENAI_API_KEY)
@@ -20,18 +18,6 @@ client = openai.OpenAI(api_key=OPENAI_API_KEY)
 # Initialize Pinecone
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index("newsbot")
-
-# Login to Hugging Face
-login(HUGGINGFACE_API_KEY)
-
-# Initialize Mistral Mixtral-8x7B for translation
-repo_id = "mistralai/Mixtral-8x7B-Instruct-v0.1"
-translator = HuggingFaceEndpoint(
-    repo_id=repo_id,
-    temperature=0.8,
-    top_k=50,
-    huggingfacehub_api_token=HUGGINGFACE_API_KEY
-)
 
 STOPWORDS = {"news", "give", "me", "about", "on", "the", "is", "of", "for", "and", "with", "to", "in", "a"}
 
@@ -41,11 +27,9 @@ def extract_keywords(text):
     return " ".join(keywords)
 
 def translate_to_gujarati(text):
-    """ Translates text to Gujarati using Mixtral-8x7B """
+    """ Translates text to Gujarati using DeepTranslate """
     try:
-        prompt = f"Translate the following text to Gujarati:\n\n{text}"
-        response = translator.invoke(prompt)
-        return response.strip()
+        return GoogleTranslator(source='auto', target='gu').translate(text)
     except Exception as e:
         st.error(f"Translation error: {e}")
     return text  # Fallback to original text
