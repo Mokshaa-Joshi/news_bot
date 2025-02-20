@@ -29,9 +29,12 @@ def extract_keywords(text):
 
 # Function to translate input to Gujarati if needed
 def translate_to_gujarati(text):
-    if re.search(r'[a-zA-Z]', text):  # If input contains English letters
-        return GoogleTranslator(source='en', target='gu').translate(text)
-    return text  # Already in Gujarati
+    try:
+        if re.search(r'[a-zA-Z]', text):  # If input contains English letters
+            return GoogleTranslator(source='en', target='gu').translate(text)
+    except Exception as e:
+        print(f"Translation error: {e}")
+    return text  # Already in Gujarati or translation failed
 
 # Function to generate query embeddings using OpenAI
 def get_embedding(text):
@@ -62,7 +65,7 @@ def search_news(query):
     # Extract important keywords (remove stopwords)
     cleaned_query = extract_keywords(query)
     
-    # Translate query to Gujarati
+    # Translate extracted keywords to Gujarati
     translated_query = translate_to_gujarati(cleaned_query)
 
     # Use both English and Gujarati queries
@@ -85,13 +88,13 @@ def search_news(query):
 
     # If keyword search has results, return them
     if all_results:
-        return all_results, translated_query
+        return all_results, cleaned_query, translated_query
 
     # If no keyword match, fall back to vector search
     query_embedding = get_embedding(cleaned_query)  # Use cleaned English query for embeddings
     vector_results = index.query(vector=query_embedding, top_k=5, include_metadata=True)
 
-    return vector_results["matches"], translated_query
+    return vector_results["matches"], cleaned_query, translated_query
 
 # Streamlit UI
 st.title("Gujarati News Search 📰")
@@ -101,8 +104,14 @@ user_query = st.text_input("Enter your query (English or Gujarati):")
 if st.button("Search"):
     if user_query:
         # Search news using Keyword + Vector Search
-        results, translated_query = search_news(user_query)
+        results, cleaned_query, translated_query = search_news(user_query)
         
+        # Display translated query
+        if cleaned_query:
+            st.markdown(f"**🔎 Search Keywords:** `{cleaned_query}`")
+        if translated_query and translated_query != cleaned_query:
+            st.markdown(f"**🌐 Gujarati Translation:** `{translated_query}`` 🇮🇳`")
+
         # Display results
         if results:
             for news in results:
