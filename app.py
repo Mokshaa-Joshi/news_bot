@@ -110,14 +110,14 @@ st.markdown(
             background-color: #45a049;
         }
         .news-card {
-            background-color: #f9f9f9;
+            background-color: ##e0e0e0;
             padding: 15px;
             border-radius: 8px;
             box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
             margin-bottom: 15px;
         }
         .highlight {
-            background-color: yellow;
+            background-color: green;
             padding: 2px 5px;
             border-radius: 3px;
         }
