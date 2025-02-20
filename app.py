@@ -25,7 +25,7 @@ STOPWORDS = {"news", "about", "on", "the", "is", "of", "for", "and", "with", "to
 def extract_keywords(text):
     words = text.split()
     keywords = [word for word in words if word.lower() not in STOPWORDS]
-    return " ".join(keywords)  # Join back as a phrase
+    return " ".join(keywords)
 
 # Function to translate input to Gujarati if needed
 def translate_to_gujarati(text):
@@ -34,7 +34,7 @@ def translate_to_gujarati(text):
             return GoogleTranslator(source='en', target='gu').translate(text)
     except Exception as e:
         print(f"Translation error: {e}")
-    return text  # Already in Gujarati or translation failed
+    return text
 
 # Function to generate query embeddings using OpenAI
 def get_embedding(text):
@@ -49,82 +49,127 @@ def highlight_keywords(text, keywords):
     if not text or not keywords:
         return text
     
-    # Split query into words for better highlighting
     words = keywords.split()
-    
-    # Create regex pattern for multiple words
     pattern = re.compile(r'\b(' + '|'.join(map(re.escape, words)) + r')\b', re.IGNORECASE)
-    
-    # Highlight words
     highlighted_text = pattern.sub(r'<mark style="background-color: yellow;">\1</mark>', text)
     
     return highlighted_text
 
 # Function to search news using keyword filtering and vector search
 def search_news(query):
-    # Extract important keywords (remove stopwords)
     cleaned_query = extract_keywords(query)
-    
-    # Translate extracted keywords to Gujarati
     translated_query = translate_to_gujarati(cleaned_query)
 
-    # Use both English and Gujarati queries
     possible_queries = [cleaned_query, translated_query]
     all_results = []
     
     for q in possible_queries:
         try:
-            # Fetch results from Pinecone
             keyword_results = index.query(id="", top_k=50, include_metadata=True)
             news_matches = keyword_results.get("matches", [])
-
-            # Filter manually for keyword presence
             filtered_news = [news for news in news_matches if q in news["metadata"]["content"]]
 
             if filtered_news:
-                all_results.extend(filtered_news[:5])  # Limit to top 5
+                all_results.extend(filtered_news[:5])
         except Exception as e:
             print(f"Metadata filtering error: {e}")
 
-    # If keyword search has results, return them
     if all_results:
         return all_results, cleaned_query, translated_query
 
-    # If no keyword match, fall back to vector search
-    query_embedding = get_embedding(cleaned_query)  # Use cleaned English query for embeddings
+    query_embedding = get_embedding(cleaned_query)
     vector_results = index.query(vector=query_embedding, top_k=5, include_metadata=True)
 
     return vector_results["matches"], cleaned_query, translated_query
 
 # Streamlit UI
-st.title("Gujarati News Search 📰")
+st.set_page_config(page_title="Gujarati News Bot", page_icon="📰", layout="centered")
 
-user_query = st.text_input("Enter your query (English or Gujarati):")
+# Custom Styling
+st.markdown(
+    """
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+        }
+        .stTextInput > div > div > input {
+            border: 2px solid #4CAF50;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .stButton > button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            width: 100%;
+            font-size: 16px;
+        }
+        .stButton > button:hover {
+            background-color: #45a049;
+        }
+        .news-card {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 15px;
+        }
+        .highlight {
+            background-color: yellow;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-if st.button("Search"):
+# Header Section
+st.markdown(
+    "<h1 style='text-align: center;'>📰 Gujarati News Search Bot</h1>",
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    "<p style='text-align: center; font-size: 16px;'>"
+    "Find the latest Gujarati news in seconds! Enter your query in English or Gujarati, "
+    "and this bot will fetch the most relevant articles for you."
+    "</p>",
+    unsafe_allow_html=True
+)
+
+# Input Section
+user_query = st.text_input("🔎 Enter your query (English or Gujarati):")
+
+if st.button("Search News"):
     if user_query:
-        # Search news using Keyword + Vector Search
         results, cleaned_query, translated_query = search_news(user_query)
-        
-        # Display translated query
-        if cleaned_query:
-            st.markdown(f"**🔎 Search Keywords:** `{cleaned_query}`")
-        if translated_query and translated_query != cleaned_query:
-            st.markdown(f"**🌐 Gujarati Translation:** `{translated_query}`` 🇮🇳`")
 
-        # Display results
+        # Display translated query
+        st.markdown(f"**🔑 Search Keywords:** `{cleaned_query}`")
+        if translated_query and translated_query != cleaned_query:
+            st.markdown(f"**🌐 Gujarati Translation:** `{translated_query}` 🇮🇳")
+
+        # Display Results
         if results:
             for news in results:
                 metadata = news["metadata"]
-                
-                # Highlight translated query in title & content
+
                 highlighted_title = highlight_keywords(metadata["title"], translated_query)
                 highlighted_content = highlight_keywords(metadata["content"], translated_query)
 
-                st.markdown(f"### {highlighted_title}", unsafe_allow_html=True)
-                st.write(f"**Date:** {metadata['date']}")
-                st.write(f"**[Read More]({metadata['link']})**")
-                st.markdown(highlighted_content, unsafe_allow_html=True)
-                st.markdown("---")
+                st.markdown(
+                    f"""
+                    <div class="news-card">
+                        <h3>{highlighted_title}</h3>
+                        <p><strong>📅 Date:</strong> {metadata['date']}</p>
+                        <p>{highlighted_content}</p>
+                        <p><a href="{metadata['link']}" target="_blank">🔗 Read More</a></p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
         else:
-            st.write("No news found matching your query.")
+            st.warning("⚠️ No news found matching your query.")
