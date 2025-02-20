@@ -3,16 +3,26 @@ import os
 import re
 import time
 from pinecone import Pinecone
-import openai
+from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint
 from dotenv import load_dotenv
+from huggingface_hub import login
 
 # Load API keys
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
-# Initialize OpenAI client
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
+# Initialize Hugging Face Translation Model
+repo_id = "mistralai/Mixtral-8x7B-Instruct-v0.1"
+llm = HuggingFaceEndpoint(
+    repo_id=repo_id,
+    temperature=0.8,
+    top_k=50,
+    huggingfacehub_api_token=HUGGINGFACE_API_KEY
+)
+
+# Initialize Hugging Face Embeddings
+hf_embeddings = HuggingFaceEmbeddings()
 
 # Initialize Pinecone
 pc = Pinecone(api_key=PINECONE_API_KEY)
@@ -26,24 +36,18 @@ def extract_keywords(text):
     return " ".join(keywords)
 
 def translate_to_gujarati(text):
-    """ Translates text to Gujarati using OpenAI GPT-4 Turbo. """
+    """ Translates text to Gujarati using Mixtral-8x7B (Hugging Face) """
     try:
-        response = client.chat.completions.create(
-            model="gpt-4-turbo",
-            messages=[
-                {"role": "system", "content": "Translate the following text to Gujarati."},
-                {"role": "user", "content": text}
-            ]
-        )
-        return response.choices[0].message.content.strip()
+        prompt = f"Translate this English text to Gujarati: {text}"
+        response = llm.invoke(prompt)
+        return response.strip()
     except Exception as e:
         st.error(f"Translation error: {e}")
     return text  # Fallback to original text
 
 def get_embedding(text):
-    """ Generate text embeddings using OpenAI """
-    response = client.embeddings.create(input=text, model="text-embedding-ada-002")
-    return response.data[0].embedding
+    """ Generate text embeddings using Hugging Face """
+    return hf_embeddings.embed_query(text)
 
 def highlight_keywords(text, keywords):
     """ Highlights keywords in text using HTML markup """
