@@ -98,7 +98,7 @@ st.markdown(
             font-size: 14px;
         }
         .read-more-button:hover {
-            background-color: #45a049;
+            background-color: #000000;
         }
     </style>
     """,
