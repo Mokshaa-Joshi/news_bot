@@ -32,8 +32,15 @@ def get_embedding(text):
 
 # Function to highlight keywords in text
 def highlight_keywords(text, keyword):
-    pattern = re.compile(re.escape(keyword), re.IGNORECASE)  # Case-insensitive match
-    highlighted_text = pattern.sub(f'<mark style="background-color: yellow;">{keyword}</mark>', text)
+    if not text or not keyword:
+        return text  # Return original text if empty
+    
+    # Use word boundaries (\b) for exact word matching (case-insensitive)
+    pattern = re.compile(rf"({re.escape(keyword)})", re.IGNORECASE)
+    
+    # Replace matched keywords with highlighted version
+    highlighted_text = pattern.sub(r'<mark style="background-color: yellow;">\1</mark>', text)
+    
     return highlighted_text
 
 # Function to search news using keyword filtering and vector search
@@ -60,13 +67,13 @@ def search_news(query):
 
     # **If keyword search finds results, return them first**
     if filtered_news:
-        return filtered_news[:5]  # Return the top 5 matches
+        return filtered_news[:5], translated_query  # Return top 5 matches + translated query
 
     # **2. If no keyword match, fall back to vector search**
     query_embedding = get_embedding(translated_query)
     vector_results = index.query(vector=query_embedding, top_k=5, include_metadata=True)
 
-    return vector_results["matches"]
+    return vector_results["matches"], translated_query
 
 # Streamlit UI
 st.title("Gujarati News Search")
@@ -76,16 +83,16 @@ user_query = st.text_input("Enter your query (English or Gujarati):")
 if st.button("Search"):
     if user_query:
         # Search news using Keyword + Vector Search
-        results = search_news(user_query)
+        results, translated_query = search_news(user_query)
         
         # Display results
         if results:
             for news in results:
                 metadata = news["metadata"]
                 
-                # Highlight query keyword in title & content
-                highlighted_title = highlight_keywords(metadata["title"], user_query)
-                highlighted_content = highlight_keywords(metadata["content"], user_query)
+                # Highlight translated query in title & content
+                highlighted_title = highlight_keywords(metadata["title"], translated_query)
+                highlighted_content = highlight_keywords(metadata["content"], translated_query)
 
                 st.markdown(f"### {highlighted_title}", unsafe_allow_html=True)
                 st.write(f"**Date:** {metadata['date']}")
