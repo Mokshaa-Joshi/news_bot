@@ -19,14 +19,23 @@ client = openai.OpenAI(api_key=OPENAI_API_KEY)
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index("newsbot")
 
-# Load NLP Model (spaCy)
+# Load spaCy NLP model
 nlp = spacy.load("en_core_web_sm")
 
-# Function to extract important keywords from query
+# Function to extract important keywords (NER + noun phrases)
 def extract_keywords(text):
     doc = nlp(text)
-    keywords = [token.text for token in doc if token.pos_ in ["PROPN", "NOUN"] and not token.is_stop]
-    return keywords  # List of extracted keywords
+    keywords = set()
+
+    # Extract Named Entities (e.g., ISRO, Prime Minister)
+    for ent in doc.ents:
+        keywords.add(ent.text)
+
+    # Extract Noun Phrases (e.g., "space agency", "government policy")
+    for chunk in doc.noun_chunks:
+        keywords.add(chunk.text)
+
+    return list(keywords)
 
 # Function to translate input to Gujarati if needed
 def translate_to_gujarati(text):
@@ -57,18 +66,16 @@ def highlight_keywords(text, keywords):
 
 # Function to search news using keyword filtering and vector search
 def search_news(query):
-    # Extract important keywords from query
-    keywords = extract_keywords(query)
+    # Extract important keywords
+    important_keywords = extract_keywords(query)
     
-    if not keywords:
-        return [], ""  # No valid keywords found
+    # Translate keywords to Gujarati
+    translated_keywords = [translate_to_gujarati(word) for word in important_keywords]
 
-    translated_keywords = [translate_to_gujarati(word) for word in keywords]
-    
-    # Use both English and Gujarati queries
-    possible_queries = keywords + translated_keywords
+    # Use both English and Gujarati keywords
+    possible_queries = important_keywords + translated_keywords
     all_results = []
-    
+
     for q in possible_queries:
         try:
             # Fetch results from Pinecone
@@ -85,13 +92,13 @@ def search_news(query):
 
     # If keyword search has results, return them
     if all_results:
-        return all_results, keywords
+        return all_results, important_keywords
 
     # If no keyword match, fall back to vector search
-    query_embedding = get_embedding(" ".join(keywords))  # Use extracted keywords
+    query_embedding = get_embedding(" ".join(important_keywords))  # Use extracted keywords
     vector_results = index.query(vector=query_embedding, top_k=5, include_metadata=True)
 
-    return vector_results["matches"], keywords
+    return vector_results["matches"], important_keywords
 
 # Streamlit UI
 st.title("Gujarati News Search 📰")
@@ -100,9 +107,9 @@ user_query = st.text_input("Enter your query (English or Gujarati):")
 
 if st.button("Search"):
     if user_query:
-        # Search news using Keyword + Vector Search
+        # Search news using extracted keywords
         results, extracted_keywords = search_news(user_query)
-        
+
         # Display results
         if results:
             for news in results:
