@@ -19,7 +19,7 @@ pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index("newsbot")
 
 # Common words to ignore in keyword extraction
-STOPWORDS = {"news", "about", "on", "the", "is", "of", "for", "and", "with", "to", "in", "a"}
+STOPWORDS = {"news", "give", "me", "about", "on", "the", "is", "of", "for", "and", "with", "to", "in", "a"}
 
 # Function to extract important keywords from user query
 def extract_keywords(text):
