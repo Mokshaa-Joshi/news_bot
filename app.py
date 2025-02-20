@@ -105,7 +105,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.markdown("<h1 style='text-align: center;'>📰 Gujarati News Search Bot</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>📰 Gujarati News Bot</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;'>Enter your query in English or Gujarati and get the latest news instantly.</p>", unsafe_allow_html=True)
 
 user_query = st.text_input("🔎 Enter your query (English or Gujarati):")
