@@ -1,55 +1,40 @@
 import streamlit as st
 import os
 import re
-import nltk
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from nltk.tag import pos_tag
+import spacy
 from pinecone import Pinecone
 from deep_translator import GoogleTranslator
 import openai
 from dotenv import load_dotenv
 
-# ✅ Fix: Use a local directory for NLTK data (No permission error)
-NLTK_PATH = "./nltk_data"
-if not os.path.exists(NLTK_PATH):
-    os.makedirs(NLTK_PATH, exist_ok=True)  # Create if not exists
-
-nltk.data.path.append(NLTK_PATH)  # Tell NLTK to use this path
-
-# 🔹 Download NLTK resources locally
-nltk_resources = ["punkt", "stopwords", "averaged_perceptron_tagger"]
-for resource in nltk_resources:
-    nltk.download(resource, download_dir=NLTK_PATH)
-
-# 🔹 Load API keys securely
+# Load API keys
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# 🔹 Initialize OpenAI client
+# Initialize OpenAI client
 client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
-# 🔹 Initialize Pinecone
+# Initialize Pinecone
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index("newsbot")
 
-# 🔹 Extract important keywords using NLP
+# Load NLP Model (spaCy)
+nlp = spacy.load("en_core_web_sm")
+
+# Function to extract important keywords from query
 def extract_keywords(text):
-    words = word_tokenize(text)
-    words = [word for word in words if word.lower() not in stopwords.words("english")]  # Remove stopwords
-    
-    # Extract only proper nouns and nouns (important keywords)
-    keywords = [word for word, tag in pos_tag(words) if tag in ["NN", "NNS", "NNP", "NNPS"]]
+    doc = nlp(text)
+    keywords = [token.text for token in doc if token.pos_ in ["PROPN", "NOUN"] and not token.is_stop]
     return keywords  # List of extracted keywords
 
-# 🔹 Translate input to Gujarati if needed
+# Function to translate input to Gujarati if needed
 def translate_to_gujarati(text):
     if re.search(r'[a-zA-Z]', text):  # If input contains English letters
         return GoogleTranslator(source='en', target='gu').translate(text)
     return text  # Already in Gujarati
 
-# 🔹 Generate query embeddings using OpenAI
+# Function to generate query embeddings using OpenAI
 def get_embedding(text):
     response = client.embeddings.create(
         input=text,
@@ -57,7 +42,7 @@ def get_embedding(text):
     )
     return response.data[0].embedding
 
-# 🔹 Highlight multiple keywords in text
+# Function to highlight multiple keywords in text
 def highlight_keywords(text, keywords):
     if not text or not keywords:
         return text
@@ -70,7 +55,7 @@ def highlight_keywords(text, keywords):
     
     return highlighted_text
 
-# 🔹 Search news using keyword filtering and vector search
+# Function to search news using keyword filtering and vector search
 def search_news(query):
     # Extract important keywords from query
     keywords = extract_keywords(query)
@@ -108,7 +93,7 @@ def search_news(query):
 
     return vector_results["matches"], keywords
 
-# 🔹 Streamlit UI
+# Streamlit UI
 st.title("Gujarati News Search 📰")
 
 user_query = st.text_input("Enter your query (English or Gujarati):")
