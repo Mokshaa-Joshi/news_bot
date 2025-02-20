@@ -10,13 +10,13 @@ from deep_translator import GoogleTranslator
 import openai
 from dotenv import load_dotenv
 
-# 🔹 Ensure NLTK resources are available (fix for Streamlit Cloud)
+# 🔹 Fix: Manually Download NLTK Resources for Streamlit Cloud
 nltk_resources = ["punkt", "stopwords", "averaged_perceptron_tagger"]
 for resource in nltk_resources:
-    try:
-        nltk.data.find(f"tokenizers/{resource}")
-    except LookupError:
-        nltk.download(resource)
+    nltk.download(resource, download_dir="/usr/local/nltk_data")  # Force specific directory
+
+# Set NLTK data path (Fix for Streamlit Cloud)
+nltk.data.path.append("/usr/local/nltk_data")
 
 # 🔹 Load API keys securely
 load_dotenv()
