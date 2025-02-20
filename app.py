@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import re
 from pinecone import Pinecone
 from deep_translator import GoogleTranslator
 import openai
@@ -28,6 +29,12 @@ def get_embedding(text):
         model="text-embedding-ada-002"
     )
     return response.data[0].embedding
+
+# Function to highlight keywords in text
+def highlight_keywords(text, keyword):
+    pattern = re.compile(re.escape(keyword), re.IGNORECASE)  # Case-insensitive match
+    highlighted_text = pattern.sub(f'<mark style="background-color: yellow;">{keyword}</mark>', text)
+    return highlighted_text
 
 # Function to search news using keyword filtering and vector search
 def search_news(query):
@@ -75,10 +82,15 @@ if st.button("Search"):
         if results:
             for news in results:
                 metadata = news["metadata"]
-                st.subheader(metadata["title"])
+                
+                # Highlight query keyword in title & content
+                highlighted_title = highlight_keywords(metadata["title"], user_query)
+                highlighted_content = highlight_keywords(metadata["content"], user_query)
+
+                st.markdown(f"### {highlighted_title}", unsafe_allow_html=True)
                 st.write(f"**Date:** {metadata['date']}")
                 st.write(f"**[Read More]({metadata['link']})**")
-                st.write(metadata["content"])
+                st.markdown(highlighted_content, unsafe_allow_html=True)
                 st.markdown("---")
         else:
             st.write("No news found matching your query.")
