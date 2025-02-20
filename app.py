@@ -10,10 +10,21 @@ from deep_translator import GoogleTranslator
 import openai
 from dotenv import load_dotenv
 
-# Download required NLTK data
-nltk.download('punkt')
-nltk.download('stopwords')
-nltk.download('averaged_perceptron_tagger')
+# Ensure NLTK resources are available
+def ensure_nltk_resources():
+    resources = {
+        "tokenizers/punkt": "punkt",
+        "corpora/stopwords": "stopwords",
+        "taggers/averaged_perceptron_tagger": "averaged_perceptron_tagger"
+    }
+    
+    for resource, download_name in resources.items():
+        try:
+            nltk.data.find(resource)
+        except LookupError:
+            nltk.download(download_name)
+
+ensure_nltk_resources()  # Download missing resources if needed
 
 # Load API keys
 load_dotenv()
