@@ -12,17 +12,9 @@ from dotenv import load_dotenv
 
 # Ensure NLTK resources are available
 def ensure_nltk_resources():
-    resources = {
-        "tokenizers/punkt": "punkt",
-        "corpora/stopwords": "stopwords",
-        "taggers/averaged_perceptron_tagger": "averaged_perceptron_tagger"
-    }
-    
-    for resource, download_name in resources.items():
-        try:
-            nltk.data.find(resource)
-        except LookupError:
-            nltk.download(download_name)
+    resources = ["punkt", "stopwords", "averaged_perceptron_tagger"]
+    for res in resources:
+        nltk.download(res)
 
 ensure_nltk_resources()  # Download missing resources if needed
 
@@ -40,12 +32,13 @@ index = pc.Index("newsbot")
 
 # Function to extract important keywords using NLTK
 def extract_keywords(text):
-    words = word_tokenize(text)
+    words = word_tokenize(text)  # Tokenize input text
     words = [word for word in words if word.lower() not in stopwords.words("english")]  # Remove stopwords
     
-    # Extract only proper nouns and nouns
+    # Extract only nouns (proper nouns & common nouns)
     keywords = [word for word, tag in pos_tag(words) if tag in ["NN", "NNS", "NNP", "NNPS"]]
-    return keywords  # List of extracted keywords
+    
+    return keywords  # Return list of extracted keywords
 
 # Function to translate input to Gujarati if needed
 def translate_to_gujarati(text):
