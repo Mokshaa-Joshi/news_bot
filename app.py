@@ -29,7 +29,7 @@ def get_embedding(text):
     )
     return response.data[0].embedding
 
-# Function to search news in Pinecone (Keyword in Content + Vector Search)
+# Function to search news using keyword filtering and vector search
 def search_news(query):
     # Translate query to Gujarati (if needed)
     translated_query = translate_to_gujarati(query)
@@ -37,20 +37,23 @@ def search_news(query):
     # **1. Try metadata filtering (search by keyword in content)**
     try:
         keyword_results = index.query(
-            id="",  # Fix: Use a valid ID placeholder (empty string) instead of None
-            top_k=5,
-            include_metadata=True,
-            filter={
-                "content": {"$regex": translated_query}  # Search for exact keyword match
-            }
+            id="",
+            top_k=50,  # Retrieve more results to improve keyword matching
+            include_metadata=True
         )
+        all_news = keyword_results.get("matches", [])
+        
+        # **Perform keyword search manually in retrieved content**
+        filtered_news = [
+            news for news in all_news if translated_query in news["metadata"]["content"]
+        ]
     except Exception as e:
         print(f"Metadata filtering error: {e}")
-        keyword_results = {"matches": []}
+        filtered_news = []
 
     # **If keyword search finds results, return them first**
-    if keyword_results["matches"]:
-        return keyword_results["matches"]
+    if filtered_news:
+        return filtered_news[:5]  # Return the top 5 matches
 
     # **2. If no keyword match, fall back to vector search**
     query_embedding = get_embedding(translated_query)
