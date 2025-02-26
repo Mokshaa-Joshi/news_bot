@@ -1,8 +1,6 @@
 import streamlit as st
 import pinecone
 from sentence_transformers import SentenceTransformer
-from deep_translator import GoogleTranslator
-from langdetect import detect
 import re
 
 # 🔐 Securely Load API Keys
@@ -25,24 +23,12 @@ NEWSPAPER_NAMESPACES = {
     "sandesh": "sandesh"
 }
 
-# 🔄 Function to Translate User Query (English ↔ Gujarati)
-def translate_query(text):
-    try:
-        detected_lang = detect(text)  # Use langdetect instead of GoogleTranslator().detect
-        if detected_lang == "en":
-            return GoogleTranslator(source="en", target="gu").translate(text)
-        elif detected_lang == "gu":
-            return GoogleTranslator(source="gu", target="en").translate(text)
-    except:
-        pass  # If detection fails, return original text
-    return text  
-
 # 💬 Chat Interface Header
 st.markdown("<h1 style='text-align: center;'>🤖 NewsBot - Your Personal News Assistant</h1>", unsafe_allow_html=True)
 
 # 📝 Chat History Management
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hello! Ask me about news articles in English or Gujarati."}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hello! Ask me about news articles by keyword, date, and newspaper."}]
 
 # 📜 Display chat messages
 for msg in st.session_state.messages:
@@ -56,23 +42,20 @@ user_input = st.chat_input("Ask me about news articles...")
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
 
-    # Translate input to Gujarati if needed
-    translated_input = translate_query(user_input)
-
     # Extract date from query
-    date_match = re.search(r"\d{4}-\d{2}-\d{2}", translated_input)
+    date_match = re.search(r"\d{4}-\d{2}-\d{2}", user_input)
     date_filter = date_match.group(0) if date_match else None
 
     # Extract newspaper name
     newspaper = None
     for paper in NEWSPAPER_NAMESPACES.keys():
-        if paper in translated_input.lower():
+        if paper in user_input.lower():
             newspaper = NEWSPAPER_NAMESPACES[paper]
             break
 
     # Extract keywords
-    words = translated_input.lower().split()
-    keywords = [word for word in words if word not in ["give", "me", "news", "on", "from", "of", "date", "મને", "સમાચાર", "કહેવાઈ", "ખબર"]]
+    words = user_input.lower().split()
+    keywords = [word for word in words if word not in ["give", "me", "news", "on", "from", "of", "date"]]
     search_query = " ".join(keywords)
 
     # 📰 Validate Query
@@ -84,13 +67,12 @@ if user_input:
         # Generate Query Vector
         query_vector = model.encode(search_query).tolist()
 
-        # Query Pinecone (Search in title & content_chunk)
+        # Query Pinecone (Get initial matches)
         results = index.query(
             vector=query_vector,
             top_k=10,
             namespace=newspaper,
-            include_metadata=True,
-            filter={"$or": [{"title": {"$regex": search_query}}, {"content_chunk": {"$regex": search_query}}]}
+            include_metadata=True
         )
 
         # 📰 Fetch Full Articles (Merge All Chunks)
