@@ -18,19 +18,10 @@ model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
 # 📌 Define Newspaper Namespaces
 NEWSPAPER_NAMESPACES = {
-    "📰 Gujarat Samachar": "gujarat_samachar",
-    "🗞️ Divya Bhaskar": "divya_bhaskar",
-    "🗃️ Sandesh": "sandesh"
+    "gujarat samachar": "gujarat_samachar",
+    "divya bhaskar": "divya_bhaskar",
+    "sandesh": "sandesh"
 }
-
-# 🌟 Sidebar - Newspaper Selection
-with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Newspaper.svg/600px-Newspaper.svg.png", width=150)
-    st.markdown("### 📰 Choose a Newspaper")
-    newspaper = st.radio("Select:", list(NEWSPAPER_NAMESPACES.keys()))
-    st.markdown("💡 Example Queries:")
-    st.markdown("- _'Give me news on Budget from Gujarat Samachar of date 2025-02-23'_")
-    st.markdown("- _'Find articles about elections from Sandesh'_")
 
 # 💬 Chat Interface Header
 st.markdown("<h1 style='text-align: center;'>🤖 NewsBot - Your Personal News Assistant</h1>", unsafe_allow_html=True)
@@ -55,13 +46,24 @@ if user_input:
     date_match = re.search(r"\d{4}-\d{2}-\d{2}", user_input)
     date_filter = date_match.group(0) if date_match else None
 
+    # Extract newspaper name
+    newspaper = None
+    for paper in NEWSPAPER_NAMESPACES.keys():
+        if paper in user_input.lower():
+            newspaper = NEWSPAPER_NAMESPACES[paper]
+            break
+
     # Extract keywords
     words = user_input.lower().split()
     keywords = [word for word in words if word not in ["give", "me", "news", "on", "from", "of", "date"]]
     search_query = " ".join(keywords)
 
-    # 🔍 Perform Search Only if Query is Valid
-    if search_query:
+    # 📰 Validate Query
+    if not newspaper:
+        response = "❌ Please mention a newspaper (Gujarat Samachar, Divya Bhaskar, Sandesh)."
+    elif not search_query:
+        response = "❌ Please enter a valid search query."
+    else:
         # Generate Query Vector
         query_vector = model.encode(search_query).tolist()
 
@@ -69,24 +71,27 @@ if user_input:
         results = index.query(
             vector=query_vector,
             top_k=5,
-            namespace=NEWSPAPER_NAMESPACES[newspaper],
+            namespace=newspaper,
             include_metadata=True
         )
 
-        response = ""
+        # 📰 Display Results in Dropdown
         if results["matches"]:
+            response = "### 🔍 Search Results"
             for match in results["matches"]:
                 metadata = match["metadata"]
                 if date_filter and metadata.get("date") != date_filter:
-                    continue  # Skip articles that do not match date
+                    continue  # Skip non-matching dates
 
-                response += f"📅 **{metadata['date']}**\n🔹 **{metadata['title']}**\n📝 {metadata['content_chunk'][:200]}...\n\n"
+                with st.expander(f"📌 {metadata['title']}"):
+                    st.markdown(f"📅 **Date:** {metadata['date']}")
+                    st.markdown(f"🗞 **Newspaper:** {newspaper.replace('_', ' ').title()}")
+                    if "link" in metadata:
+                        st.markdown(f"🔗 [Read More]({metadata['link']})")
+                    st.write(f"📜 **Full Article:**\n{metadata['content_chunk']}")
 
-        if not response:
+        else:
             response = "❌ No matching news articles found."
-
-    else:
-        response = "❌ Please enter a valid search query."
 
     # 🧠 Store Bot Response in Chat History
     st.session_state.messages.append({"role": "assistant", "content": response})
