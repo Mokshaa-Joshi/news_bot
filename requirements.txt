@@ -1,8 +1,10 @@
 streamlit
 openai
 pinecone-client
+pinecone
 deep-translator
 python-dotenv
 pymongo
 spacy
 langchain_huggingface
+sentence_transformers
