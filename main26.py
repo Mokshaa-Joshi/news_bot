@@ -1,8 +1,8 @@
 import streamlit as st
 import pinecone
 from sentence_transformers import SentenceTransformer
-import re
 from deep_translator import GoogleTranslator
+import re
 
 # 🔐 Securely Load API Keys
 PINECONE_API_KEY = st.secrets["PINECONE_API_KEY"]
@@ -24,12 +24,21 @@ NEWSPAPER_NAMESPACES = {
     "sandesh": "sandesh"
 }
 
+# 🔄 Function to Translate User Query (English ↔ Gujarati)
+def translate_query(text):
+    detected_lang = GoogleTranslator().detect(text)
+    if detected_lang == "en":
+        return GoogleTranslator(source="en", target="gu").translate(text)
+    elif detected_lang == "gu":
+        return GoogleTranslator(source="gu", target="en").translate(text)
+    return text  # Return as is if already properly formatted
+
 # 💬 Chat Interface Header
 st.markdown("<h1 style='text-align: center;'>🤖 NewsBot - Your Personal News Assistant</h1>", unsafe_allow_html=True)
 
 # 📝 Chat History Management
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hello! Ask me about news articles in English or Gujarati by keyword, date, and newspaper."}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hello! Ask me about news articles in English or Gujarati."}]
 
 # 📜 Display chat messages
 for msg in st.session_state.messages:
@@ -43,12 +52,8 @@ user_input = st.chat_input("Ask me about news articles...")
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
 
-    # 🈯 Translate User Input to Gujarati (If Needed)
-    lang_detected = GoogleTranslator(source="auto", target="en").detect(user_input)
-    if lang_detected != "gu":
-        translated_input = GoogleTranslator(source="auto", target="gu").translate(user_input)
-    else:
-        translated_input = user_input  # Already in Gujarati
+    # Translate input to Gujarati if needed
+    translated_input = translate_query(user_input)
 
     # Extract date from query
     date_match = re.search(r"\d{4}-\d{2}-\d{2}", translated_input)
@@ -61,9 +66,9 @@ if user_input:
             newspaper = NEWSPAPER_NAMESPACES[paper]
             break
 
-    # Extract keywords (English & Gujarati)
+    # Extract keywords
     words = translated_input.lower().split()
-    keywords = [word for word in words if word not in ["give", "me", "news", "on", "from", "of", "date"]]
+    keywords = [word for word in words if word not in ["give", "me", "news", "on", "from", "of", "date", "મને", "સમાચાર", "કહેવાઈ", "ખબર"]]
     search_query = " ".join(keywords)
 
     # 📰 Validate Query
@@ -75,47 +80,46 @@ if user_input:
         # Generate Query Vector
         query_vector = model.encode(search_query).tolist()
 
-        # Query Pinecone (Vector Search)
+        # Query Pinecone (Search in title & content_chunk)
         results = index.query(
             vector=query_vector,
             top_k=10,
             namespace=newspaper,
-            include_metadata=True
+            include_metadata=True,
+            filter={"$or": [{"title": {"$regex": search_query}}, {"content_chunk": {"$regex": search_query}}]}
         )
 
-        # 📰 Fetch Full Articles (Merge All Chunks & Filter by Keywords)
+        # 📰 Fetch Full Articles (Merge All Chunks)
         articles = {}
         for match in results["matches"]:
             metadata = match["metadata"]
             title = metadata["title"]
             date = metadata["date"]
             link = metadata.get("link", "")
-            chunk_content = metadata["content_chunk"]
 
             # Skip non-matching dates
             if date_filter and date != date_filter:
                 continue  
 
-            # If the article title or content chunk contains search keywords, fetch all its chunks
-            if search_query in title.lower() or any(word in chunk_content.lower() for word in keywords):
-                if title not in articles:
-                    full_chunks = index.query(
-                        vector=[0] * 384,  # Dummy vector (not searching by vector, just getting full article)
-                        top_k=100,  # Get all chunks
-                        namespace=newspaper,
-                        include_metadata=True,
-                        filter={"title": title}  # Fetch all chunks of the same article
-                    )
+            # If the title is not already stored, query all its chunks
+            if title not in articles:
+                full_chunks = index.query(
+                    vector=[0] * 384,  # Dummy vector (not searching by vector, just getting full article)
+                    top_k=100,  # Get all chunks
+                    namespace=newspaper,
+                    include_metadata=True,
+                    filter={"title": title}  # Fetch all chunks of the same article
+                )
 
-                    merged_content = {chunk["metadata"]["chunk_index"]: chunk["metadata"]["content_chunk"] for chunk in full_chunks["matches"]}
+                merged_content = {chunk["metadata"]["chunk_index"]: chunk["metadata"]["content_chunk"] for chunk in full_chunks["matches"]}
 
-                    # Store the full article
-                    articles[title] = {
-                        "date": date,
-                        "newspaper": newspaper.replace("_", " ").title(),
-                        "content": " ".join([merged_content[i] for i in sorted(merged_content)]),
-                        "link": link
-                    }
+                # Store the full article
+                articles[title] = {
+                    "date": date,
+                    "newspaper": newspaper.replace("_", " ").title(),
+                    "content": " ".join([merged_content[i] for i in sorted(merged_content)]),
+                    "link": link
+                }
 
         # 📌 Display Merged Articles
         if articles:
