@@ -56,9 +56,10 @@ if user_input:
     else:
         query_vector = model.encode(search_query).tolist()
 
+        # Perform vector search (no regex filtering)
         results = index.query(
             vector=query_vector,
-            top_k=10,
+            top_k=50,  # Retrieve more results for better filtering
             namespace=newspaper,
             include_metadata=True
         )
@@ -69,33 +70,22 @@ if user_input:
             title = metadata["title"]
             date = metadata["date"]
             link = metadata.get("link", "")
+            content_chunk = metadata.get("content_chunk", "")
 
             if date_filter and date != date_filter:
                 continue  
 
-            # Retrieve full article chunks using keyword search in both title and content
-            full_chunks = index.query(
-                vector=[0] * 384,
-                top_k=100,
-                namespace=newspaper,
-                include_metadata=True,
-                filter={
-                    "$or": [
-                        {"title": {"$regex": search_query}},
-                        {"content_chunk": {"$regex": search_query}}
-                    ]
-                }
-            )
-
-            merged_content = {chunk["metadata"]["chunk_index"]: chunk["metadata"]["content_chunk"] for chunk in full_chunks["matches"]}
-
-            if merged_content:
-                articles[title] = {
-                    "date": date,
-                    "newspaper": newspaper.replace("_", " ").title(),
-                    "content": " ".join([merged_content[i] for i in sorted(merged_content)]),
-                    "link": link
-                }
+            # **Manual filtering:** Check if keywords exist in title or content
+            if any(keyword in title.lower() or keyword in content_chunk.lower() for keyword in keywords):
+                if title not in articles:
+                    articles[title] = {
+                        "date": date,
+                        "newspaper": newspaper.replace("_", " ").title(),
+                        "content": content_chunk,
+                        "link": link
+                    }
+                else:
+                    articles[title]["content"] += " " + content_chunk  # Merge chunks
 
         if articles:
             response = "### 🔍 Search Results"
@@ -113,3 +103,4 @@ if user_input:
 
     with st.chat_message("assistant"):
         st.markdown(response)
+
