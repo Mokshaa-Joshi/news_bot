@@ -26,12 +26,12 @@ NEWSPAPER_NAMESPACES = {
 
 # 🔄 Function to Translate User Query (English ↔ Gujarati)
 def translate_query(text):
-    detected_lang = GoogleTranslator().detect(text)
-    if detected_lang == "en":
-        return GoogleTranslator(source="en", target="gu").translate(text)
-    elif detected_lang == "gu":
-        return GoogleTranslator(source="gu", target="en").translate(text)
-    return text  # Return as is if already properly formatted
+    translated_to_gu = GoogleTranslator(source="en", target="gu").translate(text)
+    translated_back_to_en = GoogleTranslator(source="gu", target="en").translate(translated_to_gu)
+
+    if text.strip().lower() == translated_back_to_en.strip().lower():
+        return text  # Already in Gujarati
+    return translated_to_gu  # Convert English to Gujarati
 
 # 💬 Chat Interface Header
 st.markdown("<h1 style='text-align: center;'>🤖 NewsBot - Your Personal News Assistant</h1>", unsafe_allow_html=True)
