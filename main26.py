@@ -2,6 +2,7 @@ import streamlit as st
 import pinecone
 from sentence_transformers import SentenceTransformer
 from deep_translator import GoogleTranslator
+from langdetect import detect
 import re
 
 # 🔐 Securely Load API Keys
@@ -26,12 +27,15 @@ NEWSPAPER_NAMESPACES = {
 
 # 🔄 Function to Translate User Query (English ↔ Gujarati)
 def translate_query(text):
-    translated_to_gu = GoogleTranslator(source="en", target="gu").translate(text)
-    translated_back_to_en = GoogleTranslator(source="gu", target="en").translate(translated_to_gu)
-
-    if text.strip().lower() == translated_back_to_en.strip().lower():
-        return text  # Already in Gujarati
-    return translated_to_gu  # Convert English to Gujarati
+    try:
+        detected_lang = detect(text)  # Use langdetect instead of GoogleTranslator().detect
+        if detected_lang == "en":
+            return GoogleTranslator(source="en", target="gu").translate(text)
+        elif detected_lang == "gu":
+            return GoogleTranslator(source="gu", target="en").translate(text)
+    except:
+        pass  # If detection fails, return original text
+    return text  
 
 # 💬 Chat Interface Header
 st.markdown("<h1 style='text-align: center;'>🤖 NewsBot - Your Personal News Assistant</h1>", unsafe_allow_html=True)
