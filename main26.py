@@ -1,9 +1,7 @@
 import streamlit as st
 import pinecone
 from sentence_transformers import SentenceTransformer
-from deep_translator import GoogleTranslator
 import re
-import asyncio
 
 # 🔐 Securely Load API Keys
 PINECONE_API_KEY = st.secrets["PINECONE_API_KEY"]
@@ -30,7 +28,7 @@ st.markdown("<h1 style='text-align: center;'>🤖 NewsBot - Your Personal News A
 
 # 📝 Chat History Management
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hello! Ask me about news articles in English or Gujarati by keyword, date, and newspaper."}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hello! Ask me about news articles by keyword, date, and newspaper."}]
 
 # 📜 Display chat messages
 for msg in st.session_state.messages:
@@ -44,25 +42,19 @@ user_input = st.chat_input("Ask me about news articles...")
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
 
-    # 🌍 Detect & Translate Query (If Needed)
-    try:
-        translated_query = GoogleTranslator(source="auto", target="en").translate(user_input)
-    except Exception:
-        translated_query = user_input  # Fallback if translation fails
-
     # Extract date from query
-    date_match = re.search(r"\d{4}-\d{2}-\d{2}", translated_query)
+    date_match = re.search(r"\d{4}-\d{2}-\d{2}", user_input)
     date_filter = date_match.group(0) if date_match else None
 
     # Extract newspaper name
     newspaper = None
     for paper in NEWSPAPER_NAMESPACES.keys():
-        if paper in translated_query.lower():
+        if paper in user_input.lower():
             newspaper = NEWSPAPER_NAMESPACES[paper]
             break
 
     # Extract keywords
-    words = translated_query.lower().split()
+    words = user_input.lower().split()
     keywords = [word for word in words if word not in ["give", "me", "news", "on", "from", "of", "date"]]
     search_query = " ".join(keywords)
 
@@ -75,10 +67,10 @@ if user_input:
         # Generate Query Vector
         query_vector = model.encode(search_query).tolist()
 
-        # 🔍 Query Pinecone (Retrieve Top 50 Results)
+        # Query Pinecone (Get initial matches)
         results = index.query(
             vector=query_vector,
-            top_k=50,  # Get enough results for manual filtering
+            top_k=10,
             namespace=newspaper,
             include_metadata=True
         )
@@ -89,37 +81,31 @@ if user_input:
             metadata = match["metadata"]
             title = metadata["title"]
             date = metadata["date"]
-            content_chunk = metadata["content_chunk"]
             link = metadata.get("link", "")
 
             # Skip non-matching dates
             if date_filter and date != date_filter:
                 continue  
 
-            # **Manual Keyword Matching in Title & Content**
-            if any(kw in title.lower() for kw in keywords) or any(kw in content_chunk.lower() for kw in keywords):
-                # Fetch all chunks of the same article
-                if title not in articles:
-                    full_chunks = index.query(
-                        vector=query_vector,  # Use the same vector to get more relevant chunks
-                        top_k=100,  # Ensure all chunks are retrieved
-                        namespace=newspaper,
-                        include_metadata=True
-                    )
+            # If the title is not already stored, query all its chunks
+            if title not in articles:
+                full_chunks = index.query(
+                    vector=[0] * 384,  # Dummy vector (not searching by vector, just getting full article)
+                    top_k=100,  # Get all chunks
+                    namespace=newspaper,
+                    include_metadata=True,
+                    filter={"title": title}  # Fetch all chunks of the same article
+                )
 
-                    # Merge all chunks in correct order
-                    merged_content = {}
-                    for chunk in full_chunks["matches"]:
-                        chunk_index = chunk["metadata"]["chunk_index"]
-                        merged_content[chunk_index] = chunk["metadata"]["content_chunk"]
+                merged_content = {chunk["metadata"]["chunk_index"]: chunk["metadata"]["content_chunk"] for chunk in full_chunks["matches"]}
 
-                    # Store full article
-                    articles[title] = {
-                        "date": date,
-                        "newspaper": newspaper.replace("_", " ").title(),
-                        "content": " ".join([merged_content[i] for i in sorted(merged_content)]),
-                        "link": link
-                    }
+                # Store the full article
+                articles[title] = {
+                    "date": date,
+                    "newspaper": newspaper.replace("_", " ").title(),
+                    "content": " ".join([merged_content[i] for i in sorted(merged_content)]),
+                    "link": link
+                }
 
         # 📌 Display Merged Articles
         if articles:
@@ -141,9 +127,3 @@ if user_input:
     # 💬 Display Bot Response
     with st.chat_message("assistant"):
         st.markdown(response)
-
-# ✅ Fix RuntimeError: "no running event loop"
-try:
-    asyncio.get_running_loop()
-except RuntimeError:
-    asyncio.run(asyncio.sleep(0))  # Ensures event loop is properly managed
