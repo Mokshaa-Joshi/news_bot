@@ -3,6 +3,7 @@ import pinecone
 from sentence_transformers import SentenceTransformer
 from deep_translator import GoogleTranslator
 import re
+import asyncio
 
 # 🔐 Securely Load API Keys
 PINECONE_API_KEY = st.secrets["PINECONE_API_KEY"]
@@ -47,7 +48,7 @@ if user_input:
     try:
         translated_query = GoogleTranslator(source="auto", target="en").translate(user_input)
     except Exception as e:
-        translated_query = user_input  # Fallback to original query if translation fails
+        translated_query = user_input  # Fallback if translation fails
 
     # Extract date from query
     date_match = re.search(r"\d{4}-\d{2}-\d{2}", translated_query)
@@ -74,18 +75,12 @@ if user_input:
         # Generate Query Vector
         query_vector = model.encode(search_query).tolist()
 
-        # 🔍 Query Pinecone (Search Title + Content)
+        # 🔍 Query Pinecone (Get top 50 results for filtering)
         results = index.query(
             vector=query_vector,
-            top_k=10,
+            top_k=50,  # Get more results for manual keyword filtering
             namespace=newspaper,
-            include_metadata=True,
-            filter={
-                "$or": [
-                    {"title": {"$regex": f".*{search_query}.*"}},
-                    {"content_chunk": {"$regex": f".*{search_query}.*"}}
-                ]
-            }
+            include_metadata=True
         )
 
         # 📰 Fetch Full Articles (Merge All Chunks)
@@ -94,31 +89,34 @@ if user_input:
             metadata = match["metadata"]
             title = metadata["title"]
             date = metadata["date"]
+            content_chunk = metadata["content_chunk"]
             link = metadata.get("link", "")
 
             # Skip non-matching dates
             if date_filter and date != date_filter:
                 continue  
 
-            # If the title is not already stored, query all its chunks
-            if title not in articles:
-                full_chunks = index.query(
-                    vector=[0] * 384,  # Dummy vector (not searching by vector, just getting full article)
-                    top_k=100,  # Get all chunks
-                    namespace=newspaper,
-                    include_metadata=True,
-                    filter={"title": title}  # Fetch all chunks of the same article
-                )
+            # **Manual Keyword Filtering in Title & Content**
+            if any(kw in title.lower() for kw in keywords) or any(kw in content_chunk.lower() for kw in keywords):
+                # Fetch all chunks if not already done
+                if title not in articles:
+                    full_chunks = index.query(
+                        vector=[0] * 384,  # Dummy vector (to get all chunks)
+                        top_k=100,
+                        namespace=newspaper,
+                        include_metadata=True,
+                        filter={"title": title}  # Get all chunks for the article
+                    )
 
-                merged_content = {chunk["metadata"]["chunk_index"]: chunk["metadata"]["content_chunk"] for chunk in full_chunks["matches"]}
+                    merged_content = {chunk["metadata"]["chunk_index"]: chunk["metadata"]["content_chunk"] for chunk in full_chunks["matches"]}
 
-                # Store the full article
-                articles[title] = {
-                    "date": date,
-                    "newspaper": newspaper.replace("_", " ").title(),
-                    "content": " ".join([merged_content[i] for i in sorted(merged_content)]),
-                    "link": link
-                }
+                    # Store the full article
+                    articles[title] = {
+                        "date": date,
+                        "newspaper": newspaper.replace("_", " ").title(),
+                        "content": " ".join([merged_content[i] for i in sorted(merged_content)]),
+                        "link": link
+                    }
 
         # 📌 Display Merged Articles
         if articles:
@@ -140,3 +138,9 @@ if user_input:
     # 💬 Display Bot Response
     with st.chat_message("assistant"):
         st.markdown(response)
+
+# ✅ Fix RuntimeError: "no running event loop"
+try:
+    asyncio.get_running_loop()
+except RuntimeError:
+    asyncio.run(asyncio.sleep(0))  # Ensures event loop is properly managed
