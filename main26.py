@@ -67,28 +67,51 @@ if user_input:
         # Generate Query Vector
         query_vector = model.encode(search_query).tolist()
 
-        # Query Pinecone
+        # Query Pinecone (Get first 10 results)
         results = index.query(
             vector=query_vector,
-            top_k=5,
+            top_k=10,
             namespace=newspaper,
             include_metadata=True
         )
 
-        # 📰 Display Results in Dropdown
-        if results["matches"]:
-            response = "### 🔍 Search Results"
-            for match in results["matches"]:
-                metadata = match["metadata"]
-                if date_filter and metadata.get("date") != date_filter:
-                    continue  # Skip non-matching dates
+        # 📰 Merge Content Chunks and Display Results
+        articles = {}
+        for match in results["matches"]:
+            metadata = match["metadata"]
+            title = metadata["title"]
+            date = metadata["date"]
+            chunk_index = metadata["chunk_index"]
+            content_chunk = metadata["content_chunk"]
+            link = metadata.get("link", "")
 
-                with st.expander(f"📌 {metadata['title']}"):
-                    st.markdown(f"📅 **Date:** {metadata['date']}")
-                    st.markdown(f"🗞 **Newspaper:** {newspaper.replace('_', ' ').title()}")
-                    if "link" in metadata:
-                        st.markdown(f"🔗 [Read More]({metadata['link']})")
-                    st.write(f"📜 **Full Article:**\n{metadata['content_chunk']}")
+            # Skip non-matching dates
+            if date_filter and date != date_filter:
+                continue  
+
+            # Group chunks under the same title
+            if title not in articles:
+                articles[title] = {
+                    "date": date,
+                    "newspaper": newspaper.replace("_", " ").title(),
+                    "content": {},
+                    "link": link
+                }
+
+            articles[title]["content"][chunk_index] = content_chunk
+
+        # 📌 Display Merged Articles
+        if articles:
+            response = "### 🔍 Search Results"
+            for title, details in articles.items():
+                full_content = " ".join([details["content"][i] for i in sorted(details["content"])])
+                
+                with st.expander(f"📌 {title}"):
+                    st.markdown(f"📅 **Date:** {details['date']}")
+                    st.markdown(f"🗞 **Newspaper:** {details['newspaper']}")
+                    if details["link"]:
+                        st.markdown(f"🔗 [Read More]({details['link']})")
+                    st.write(f"📜 **Full Article:**\n{full_content}")
 
         else:
             response = "❌ No matching news articles found."
