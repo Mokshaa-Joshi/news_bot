@@ -1,6 +1,7 @@
 import streamlit as st
 import pinecone
 from sentence_transformers import SentenceTransformer
+from deep_translator import GoogleTranslator
 import re
 
 # 🔐 Securely Load API Keys
@@ -28,7 +29,7 @@ st.markdown("<h1 style='text-align: center;'>🤖 NewsBot - Your Personal News A
 
 # 📝 Chat History Management
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hello! Ask me about news articles by keyword, date, and newspaper."}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hello! Ask me about news articles in English or Gujarati by keyword, date, and newspaper."}]
 
 # 📜 Display chat messages
 for msg in st.session_state.messages:
@@ -42,19 +43,25 @@ user_input = st.chat_input("Ask me about news articles...")
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
 
+    # 🌍 Detect & Translate Query (If Needed)
+    try:
+        translated_query = GoogleTranslator(source="auto", target="en").translate(user_input)
+    except Exception as e:
+        translated_query = user_input  # Fallback to original query if translation fails
+
     # Extract date from query
-    date_match = re.search(r"\d{4}-\d{2}-\d{2}", user_input)
+    date_match = re.search(r"\d{4}-\d{2}-\d{2}", translated_query)
     date_filter = date_match.group(0) if date_match else None
 
     # Extract newspaper name
     newspaper = None
     for paper in NEWSPAPER_NAMESPACES.keys():
-        if paper in user_input.lower():
+        if paper in translated_query.lower():
             newspaper = NEWSPAPER_NAMESPACES[paper]
             break
 
     # Extract keywords
-    words = user_input.lower().split()
+    words = translated_query.lower().split()
     keywords = [word for word in words if word not in ["give", "me", "news", "on", "from", "of", "date"]]
     search_query = " ".join(keywords)
 
@@ -67,12 +74,18 @@ if user_input:
         # Generate Query Vector
         query_vector = model.encode(search_query).tolist()
 
-        # Query Pinecone (Get initial matches)
+        # 🔍 Query Pinecone (Search Title + Content)
         results = index.query(
             vector=query_vector,
             top_k=10,
             namespace=newspaper,
-            include_metadata=True
+            include_metadata=True,
+            filter={
+                "$or": [
+                    {"title": {"$regex": f".*{search_query}.*"}},
+                    {"content_chunk": {"$regex": f".*{search_query}.*"}}
+                ]
+            }
         )
 
         # 📰 Fetch Full Articles (Merge All Chunks)
