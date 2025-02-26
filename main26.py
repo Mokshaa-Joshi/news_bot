@@ -47,7 +47,7 @@ if user_input:
     # 🌍 Detect & Translate Query (If Needed)
     try:
         translated_query = GoogleTranslator(source="auto", target="en").translate(user_input)
-    except Exception as e:
+    except Exception:
         translated_query = user_input  # Fallback if translation fails
 
     # Extract date from query
@@ -75,10 +75,10 @@ if user_input:
         # Generate Query Vector
         query_vector = model.encode(search_query).tolist()
 
-        # 🔍 Query Pinecone (Get top 50 results for filtering)
+        # 🔍 Query Pinecone (Retrieve Top 50 Results)
         results = index.query(
             vector=query_vector,
-            top_k=50,  # Get more results for manual keyword filtering
+            top_k=50,  # Get enough results for manual filtering
             namespace=newspaper,
             include_metadata=True
         )
@@ -96,21 +96,24 @@ if user_input:
             if date_filter and date != date_filter:
                 continue  
 
-            # **Manual Keyword Filtering in Title & Content**
+            # **Manual Keyword Matching in Title & Content**
             if any(kw in title.lower() for kw in keywords) or any(kw in content_chunk.lower() for kw in keywords):
-                # Fetch all chunks if not already done
+                # Fetch all chunks of the same article
                 if title not in articles:
                     full_chunks = index.query(
-                        vector=[0] * 384,  # Dummy vector (to get all chunks)
-                        top_k=100,
+                        vector=query_vector,  # Use the same vector to get more relevant chunks
+                        top_k=100,  # Ensure all chunks are retrieved
                         namespace=newspaper,
-                        include_metadata=True,
-                        filter={"title": title}  # Get all chunks for the article
+                        include_metadata=True
                     )
 
-                    merged_content = {chunk["metadata"]["chunk_index"]: chunk["metadata"]["content_chunk"] for chunk in full_chunks["matches"]}
+                    # Merge all chunks in correct order
+                    merged_content = {}
+                    for chunk in full_chunks["matches"]:
+                        chunk_index = chunk["metadata"]["chunk_index"]
+                        merged_content[chunk_index] = chunk["metadata"]["content_chunk"]
 
-                    # Store the full article
+                    # Store full article
                     articles[title] = {
                         "date": date,
                         "newspaper": newspaper.replace("_", " ").title(),
