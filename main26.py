@@ -2,6 +2,7 @@ import streamlit as st
 import pinecone
 from sentence_transformers import SentenceTransformer
 import re
+from deep_translator import GoogleTranslator
 
 PINECONE_API_KEY = st.secrets["PINECONE_API_KEY"]
 
@@ -32,16 +33,19 @@ user_input = st.chat_input("Ask me about news articles...")
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
 
-    date_match = re.search(r"\d{4}-\d{2}-\d{2}", user_input)
+    # Translate input to English if it's in Gujarati
+    translated_input = GoogleTranslator(source="auto", target="en").translate(user_input)
+
+    date_match = re.search(r"\d{4}-\d{2}-\d{2}", translated_input)
     date_filter = date_match.group(0) if date_match else None
 
     newspaper = None
     for paper in NEWSPAPER_NAMESPACES.keys():
-        if paper in user_input.lower():
+        if paper in translated_input.lower():
             newspaper = NEWSPAPER_NAMESPACES[paper]
             break
 
-    words = user_input.lower().split()
+    words = translated_input.lower().split()
     keywords = [word for word in words if word not in ["give", "me", "news", "on", "from", "of", "date"]]
     search_query = " ".join(keywords)
 
@@ -69,17 +73,23 @@ if user_input:
             if date_filter and date != date_filter:
                 continue  
 
-            if title not in articles:
-                full_chunks = index.query(
-                    vector=[0] * 384,
-                    top_k=100,
-                    namespace=newspaper,
-                    include_metadata=True,
-                    filter={"title": title}
-                )
+            # Retrieve full article chunks using keyword search in both title and content
+            full_chunks = index.query(
+                vector=[0] * 384,
+                top_k=100,
+                namespace=newspaper,
+                include_metadata=True,
+                filter={
+                    "$or": [
+                        {"title": {"$regex": search_query}},
+                        {"content_chunk": {"$regex": search_query}}
+                    ]
+                }
+            )
 
-                merged_content = {chunk["metadata"]["chunk_index"]: chunk["metadata"]["content_chunk"] for chunk in full_chunks["matches"]}
+            merged_content = {chunk["metadata"]["chunk_index"]: chunk["metadata"]["content_chunk"] for chunk in full_chunks["matches"]}
 
+            if merged_content:
                 articles[title] = {
                     "date": date,
                     "newspaper": newspaper.replace("_", " ").title(),
