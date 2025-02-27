@@ -2,7 +2,7 @@ import streamlit as st
 import os
 import re
 import time
-from pinecone import Pinecone
+import pinecone
 import openai
 from dotenv import load_dotenv
 from deep_translator import GoogleTranslator
