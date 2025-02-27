@@ -19,7 +19,7 @@ index = pc.Index("news2")
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # 🚫 Stopwords for keyword extraction
-STOPWORDS = {"news", "give", "me", "about", "on", "the", "is", "of", "for", "and", "with", "to", "in", "a"}
+STOPWORDS = {"news", "give", "me", "about", "on", "the", "is", "of", "for", "and", "with", "to", "in", "a","from"}
 
 # 📌 Define Newspaper Namespaces
 NEWSPAPER_NAMESPACES = {
