@@ -23,9 +23,9 @@ STOPWORDS = {"news", "give", "me", "about", "on", "the", "is", "of", "for", "and
 
 # 📌 Define Newspaper Namespaces
 NEWSPAPER_NAMESPACES = {
-    "gujarat samachar": "gujarat_samachar",
-    "divya bhaskar": "divya_bhaskar",
-    "sandesh": "sandesh"
+    "Gujarat Samachar": "gujarat_samachar",
+    "Divya Bhaskar": "divya_bhaskar",
+    "Sandesh": "sandesh"
 }
 
 def extract_keywords(text):
@@ -95,41 +95,36 @@ st.set_page_config(page_title="Gujarati News Bot", page_icon="📰", layout="cen
 st.markdown("<h1 style='text-align: center;'>📰 Gujarati News Bot</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;'>Ask about news articles in English or Gujarati.</p>", unsafe_allow_html=True)
 
+# 🏆 Dropdown for Newspaper Selection
+newspaper_choice = st.selectbox("🗞 Select a Newspaper", options=["Gujarat Samachar", "Divya Bhaskar", "Sandesh"])
+
 user_query = st.text_input("🔎 Ask me about news articles...")
 
 if st.button("Search News"):
     if user_query:
-        # Detect newspaper
-        newspaper = None
-        for paper in NEWSPAPER_NAMESPACES.keys():
-            if paper in user_query.lower():
-                newspaper = NEWSPAPER_NAMESPACES[paper]
-                break
+        newspaper = NEWSPAPER_NAMESPACES[newspaper_choice]
 
-        if not newspaper:
-            st.warning("⚠️ Please mention a newspaper (Gujarat Samachar, Divya Bhaskar, Sandesh).")
+        with st.spinner("Searching news..."):
+            articles, cleaned_query, translated_query = search_news(user_query, newspaper)
+
+        st.markdown(f"**🔑 Keywords Used:** `{cleaned_query}`")
+        if translated_query and translated_query != cleaned_query:
+            st.markdown(f"**🌐 Gujarati Translation:** `{translated_query}` 🇮🇳")
+
+        # 📰 Display results
+        if articles:
+            for title, details in articles.items():
+                highlighted_title = highlight_keywords(title, translated_query)
+                highlighted_content = highlight_keywords(details["content"], translated_query)
+
+                st.markdown(f"""
+                <div style="background-color:#f9f9f9; padding:15px; border-radius:8px; box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); margin-bottom: 15px;">
+                    <h3>{highlighted_title}</h3>
+                    <p><strong>📅 Date:</strong> {details['date']}</p>
+                    <p><strong>🗞 Newspaper:</strong> {details['newspaper']}</p>
+                    <p>{highlighted_content}</p>
+                    <p><a href="{details['link']}" target="_blank" style="background-color: #333; color: white; padding: 5px 10px; text-decoration: none; border-radius: 5px;">🔗 Read More</a></p>
+                </div>
+                """, unsafe_allow_html=True)
         else:
-            with st.spinner("Searching news..."):
-                articles, cleaned_query, translated_query = search_news(user_query, newspaper)
-
-            st.markdown(f"**🔑 Keywords Used:** `{cleaned_query}`")
-            if translated_query and translated_query != cleaned_query:
-                st.markdown(f"**🌐 Gujarati Translation:** `{translated_query}` 🇮🇳")
-
-            # 📰 Display results
-            if articles:
-                for title, details in articles.items():
-                    highlighted_title = highlight_keywords(title, translated_query)
-                    highlighted_content = highlight_keywords(details["content"], translated_query)
-
-                    st.markdown(f"""
-                    <div style="background-color:#f9f9f9; padding:15px; border-radius:8px; box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); margin-bottom: 15px;">
-                        <h3>{highlighted_title}</h3>
-                        <p><strong>📅 Date:</strong> {details['date']}</p>
-                        <p><strong>🗞 Newspaper:</strong> {details['newspaper']}</p>
-                        <p>{highlighted_content}</p>
-                        <p><a href="{details['link']}" target="_blank" style="background-color: #333; color: white; padding: 5px 10px; text-decoration: none; border-radius: 5px;">🔗 Read More</a></p>
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.warning("⚠️ No matching news articles found.")
+            st.warning("⚠️ No matching news articles found.")
