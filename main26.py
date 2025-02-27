@@ -55,14 +55,15 @@ def highlight_keywords(text, keywords):
     return pattern.sub(r'<mark style="background-color: yellow; color: black;">\1</mark>', text)
 
 def search_news(query, newspaper, date_filter):
-    """ Searches news articles using Pinecone vector search with strict keyword filtering """
+    """ Searches news articles using Pinecone vector search """
     cleaned_query = extract_keywords(query)
     translated_query = translate_to_gujarati(cleaned_query)
-    query_embedding = get_embedding(cleaned_query)
+    query_embedding = get_embedding(cleaned_query)  # ✅ Now uses 384-dimension embeddings
 
     # 🔍 Query Pinecone (Ensure 384-dimension vector)
     results = index.query(vector=query_embedding, top_k=10, namespace=newspaper, include_metadata=True)
 
+    # 📌 Fetch Full Articles
     articles = {}
     for match in results["matches"]:
         metadata = match["metadata"]
@@ -82,17 +83,13 @@ def search_news(query, newspaper, date_filter):
             )
 
             merged_content = {chunk["metadata"]["chunk_index"]: chunk["metadata"]["content_chunk"] for chunk in full_chunks["matches"]}
-            full_text = " ".join([merged_content[i] for i in sorted(merged_content)])
 
-            # ✅ Strict filtering: Keep only articles containing the keyword
-            if (cleaned_query.lower() in title.lower() or cleaned_query.lower() in full_text.lower()) or \
-               (translated_query.lower() in title.lower() or translated_query.lower() in full_text.lower()):
-                articles[title] = {
-                    "date": date,
-                    "newspaper": newspaper.replace("_", " ").title(),
-                    "content": full_text,
-                    "link": link
-                }
+            articles[title] = {
+                "date": date,
+                "newspaper": newspaper.replace("_", " ").title(),
+                "content": " ".join([merged_content[i] for i in sorted(merged_content)]),
+                "link": link
+            }
 
     return articles, cleaned_query, translated_query
 
@@ -134,9 +131,9 @@ if user_input:
             articles, cleaned_query, translated_query = search_news(user_input, newspaper, date_filter)
 
         # Display search details
-        st.markdown(f"**🔑 Keywords Used:** `{cleaned_query}`")
+        st.markdown(f"**🔑 Keywords Used:** {cleaned_query}")
         if translated_query and translated_query != cleaned_query:
-            st.markdown(f"**🌐 Gujarati Translation:** `{translated_query}` 🇮🇳")
+            st.markdown(f"**🌐 Gujarati Translation:** {translated_query} 🇮🇳")
 
         # 📰 Display results
         if articles:
