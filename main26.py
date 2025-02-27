@@ -24,7 +24,7 @@ NEWSPAPER_NAMESPACES = {
     "sandesh": "sandesh"
 }
 
-st.markdown("<h1 style='text-align: center;'>🤖 NewsBot - Your Personal News Assistant</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'> NewsBot - Your Personal News Assistant</h1>", unsafe_allow_html=True)
 
 # Store chat messages
 if "messages" not in st.session_state:
