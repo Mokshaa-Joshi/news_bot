@@ -3,21 +3,20 @@ import os
 import re
 import time
 import pinecone
-import openai
 from dotenv import load_dotenv
 from deep_translator import GoogleTranslator
+from sentence_transformers import SentenceTransformer  # ✅ Correct embedding model
 
 # 🔐 Load API Keys
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# 🚀 Initialize OpenAI client
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 # 🌲 Initialize Pinecone
 pc = pinecone.Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index("news2")
+
+# 🚀 Load Correct Embedding Model (384 dimensions)
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # 🚫 Stopwords for keyword extraction
 STOPWORDS = {"news", "give", "me", "about", "on", "the", "is", "of", "for", "and", "with", "to", "in", "a"}
@@ -44,9 +43,8 @@ def translate_to_gujarati(text):
     return text  # Fallback to original text
 
 def get_embedding(text):
-    """ Generate text embeddings using OpenAI """
-    response = client.embeddings.create(input=text, model="text-embedding-ada-002")
-    return response.data[0].embedding
+    """ Generate text embeddings using Sentence Transformers (384 dimension) """
+    return embedding_model.encode(text).tolist()  # ✅ Correct dimension
 
 def highlight_keywords(text, keywords):
     """ Highlights keywords in text using HTML """
@@ -60,9 +58,9 @@ def search_news(query, newspaper, date_filter):
     """ Searches news articles using Pinecone vector search """
     cleaned_query = extract_keywords(query)
     translated_query = translate_to_gujarati(cleaned_query)
-    query_embedding = get_embedding(cleaned_query)
+    query_embedding = get_embedding(cleaned_query)  # ✅ Now uses 384-dimension embeddings
 
-    # 🔍 Query Pinecone
+    # 🔍 Query Pinecone (Ensure 384-dimension vector)
     results = index.query(vector=query_embedding, top_k=10, namespace=newspaper, include_metadata=True)
 
     # 📌 Fetch Full Articles
@@ -77,7 +75,7 @@ def search_news(query, newspaper, date_filter):
 
         if title not in articles:
             full_chunks = index.query(
-                vector=[0] * 1536,  # Dummy vector
+                vector=[0] * 384,  # ✅ Dummy vector now 384-dimension
                 top_k=100,
                 namespace=newspaper,
                 include_metadata=True,
