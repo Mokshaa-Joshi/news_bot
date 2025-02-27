@@ -6,10 +6,12 @@ import pinecone
 from dotenv import load_dotenv
 from deep_translator import GoogleTranslator
 from sentence_transformers import SentenceTransformer
+import openai
 
 # Load API Keys
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Initialize Pinecone
 pc = pinecone.Pinecone(api_key=PINECONE_API_KEY)
@@ -17,6 +19,7 @@ index = pc.Index("news2")
 
 # Load MiniLM Embedding Model (384 dimensions)
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+openai.api_key = OPENAI_API_KEY
 
 # Stopwords for keyword extraction
 STOPWORDS = {"news", "give", "me", "about", "on", "the", "is", "of", "for", "and", "with", "to", "in", "a", "from"}
@@ -50,37 +53,60 @@ def highlight_keywords(text, keywords):
     pattern = re.compile(r'\b(' + '|'.join(map(re.escape, words)) + r')\b', re.IGNORECASE)
     return pattern.sub(r'<mark style="background-color: yellow; color: black;">\1</mark>', text)
 
+def rerank_and_summarize(results, query):
+    """Uses GPT-4 to rerank search results and generate summaries."""
+    prompt = f"""
+    You are an AI assistant that refines and improves search results. Given a user's query and retrieved news articles,
+    rerank them based on relevance and provide concise summaries.
+
+    Query: {query}
+    
+    Articles:
+    {results}
+    
+    Return the reranked list in JSON format with fields: title, date, newspaper, content, link, and summary.
+    """
+    
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[{"role": "system", "content": "You are a helpful assistant."},
+                  {"role": "user", "content": prompt}]
+    )
+    
+    return response["choices"][0]["message"]["content"]
+
 def search_news(query, newspaper):
     cleaned_query = extract_keywords(query)
     translated_query = translate_text(cleaned_query)
     query_embedding = get_embedding(cleaned_query)
 
     results = index.query(vector=query_embedding, top_k=5, namespace=newspaper, include_metadata=True)
-
-    articles = {}
+    
+    articles = []
     for match in results["matches"]:
         metadata = match["metadata"]
         title, date, link = metadata["title"], metadata["date"], metadata.get("link", "")
         
-        if title not in articles:
-            full_chunks = index.query(
-                vector=[0] * 384,
-                top_k=100,
-                namespace=newspaper,
-                include_metadata=True,
-                filter={"title": title}
-            )
-            merged_content = {chunk["metadata"]["chunk_index"]: chunk["metadata"]["content_chunk"] for chunk in full_chunks["matches"]}
-            full_text = " ".join([merged_content[i] for i in sorted(merged_content)])
-
-            articles[title] = {
-                "date": date,
-                "newspaper": newspaper.replace("_", " ").title(),
-                "content": full_text,
-                "link": link
-            }
-
-    return articles, cleaned_query, translated_query
+        full_chunks = index.query(
+            vector=[0] * 384,
+            top_k=100,
+            namespace=newspaper,
+            include_metadata=True,
+            filter={"title": title}
+        )
+        merged_content = {chunk["metadata"]["chunk_index"]: chunk["metadata"]["content_chunk"] for chunk in full_chunks["matches"]}
+        full_text = " ".join([merged_content[i] for i in sorted(merged_content)])
+        
+        articles.append({
+            "title": title,
+            "date": date,
+            "newspaper": newspaper.replace("_", " ").title(),
+            "content": full_text,
+            "link": link
+        })
+    
+    reranked_articles = rerank_and_summarize(articles, cleaned_query)
+    return reranked_articles, cleaned_query, translated_query
 
 # Streamlit UI
 st.set_page_config(page_title="Gujarati News Bot", page_icon="📰", layout="wide")
@@ -110,26 +136,23 @@ with col1:
     if st.button("Search News"):
         if user_query:
             newspaper = NEWSPAPER_NAMESPACES[newspaper_choice]
-
+            
             with st.spinner("🔍 Searching news..."):
                 articles, cleaned_query, translated_query = search_news(user_query, newspaper)
-
+            
             st.markdown(f"**🔑 Keywords Used:** `{cleaned_query}`")
             if translated_query and translated_query != cleaned_query:
                 st.markdown(f"**🌐 Gujarati Translation:** `{translated_query}` 🇮🇳")
-
+            
             if articles:
-                for title, details in articles.items():
-                    highlighted_title = highlight_keywords(title, translated_query)
-                    highlighted_content = highlight_keywords(details["content"], translated_query)
-
+                for article in articles:
                     st.markdown(f"""
                     <div class="article-container">
-                        <h3>{highlighted_title}</h3>
-                        <p><strong>📅 Date:</strong> {details['date']}</p>
-                        <p><strong>🗞 Newspaper:</strong> {details['newspaper']}</p>
-                        <p>{highlighted_content}</p>
-                        <p><a href="{details['link']}" target="_blank" style="background-color: #333; color: white; padding: 5px 10px; text-decoration: none; border-radius: 5px;">🔗 Read More</a></p>
+                        <h3>{article['title']}</h3>
+                        <p><strong>📅 Date:</strong> {article['date']}</p>
+                        <p><strong>🗞 Newspaper:</strong> {article['newspaper']}</p>
+                        <p><strong>🔍 Summary:</strong> {article['summary']}</p>
+                        <p><a href="{article['link']}" target="_blank">🔗 Read More</a></p>
                     </div>
                     """, unsafe_allow_html=True)
             else:
