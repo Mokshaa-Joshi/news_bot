@@ -19,7 +19,7 @@ index = pc.Index("news2")
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # 🚫 Stopwords for keyword extraction
-STOPWORDS = {"news", "give", "me", "about", "on", "the", "is", "of", "for", "and", "with", "to", "in", "a","from"}
+STOPWORDS = {"news", "give", "me", "about", "on", "the", "is", "of", "for", "and", "with", "to", "in", "a", "from"}
 
 # 📌 Define Newspaper Namespaces
 NEWSPAPER_NAMESPACES = {
@@ -55,16 +55,21 @@ def highlight_keywords(text, keywords):
     return pattern.sub(r'<mark style="background-color: yellow; color: black;">\1</mark>', text)
 
 def search_news(query, newspaper, date_filter):
-    """ Searches news articles using Pinecone vector search """
+    """ Searches news articles using Pinecone vector search with improved keyword matching """
     cleaned_query = extract_keywords(query)
     translated_query = translate_to_gujarati(cleaned_query)
-    query_embedding = get_embedding(cleaned_query)  # ✅ Now uses 384-dimension embeddings
+    query_embedding = get_embedding(cleaned_query)
 
     # 🔍 Query Pinecone (Ensure 384-dimension vector)
     results = index.query(vector=query_embedding, top_k=10, namespace=newspaper, include_metadata=True)
 
-    # 📌 Fetch Full Articles
     articles = {}
+    
+    # 🛠 Debug: Print retrieved metadata
+    print("🔍 Pinecone Query Results:")
+    for match in results["matches"]:
+        print(match["metadata"])
+
     for match in results["matches"]:
         metadata = match["metadata"]
         title, date, link = metadata["title"], metadata["date"], metadata.get("link", "")
@@ -83,13 +88,16 @@ def search_news(query, newspaper, date_filter):
             )
 
             merged_content = {chunk["metadata"]["chunk_index"]: chunk["metadata"]["content_chunk"] for chunk in full_chunks["matches"]}
+            full_text = " ".join([merged_content[i] for i in sorted(merged_content)])
 
-            articles[title] = {
-                "date": date,
-                "newspaper": newspaper.replace("_", " ").title(),
-                "content": " ".join([merged_content[i] for i in sorted(merged_content)]),
-                "link": link
-            }
+            # ✅ Improved Filtering: Partial Match Allowed
+            if any(word in title.lower() or word in full_text.lower() for word in cleaned_query.split()):
+                articles[title] = {
+                    "date": date,
+                    "newspaper": newspaper.replace("_", " ").title(),
+                    "content": full_text,
+                    "link": link
+                }
 
     return articles, cleaned_query, translated_query
 
@@ -131,9 +139,9 @@ if user_input:
             articles, cleaned_query, translated_query = search_news(user_input, newspaper, date_filter)
 
         # Display search details
-        st.markdown(f"**🔑 Keywords Used:** {cleaned_query}")
+        st.markdown(f"**🔑 Keywords Used:** `{cleaned_query}`")
         if translated_query and translated_query != cleaned_query:
-            st.markdown(f"**🌐 Gujarati Translation:** {translated_query} 🇮🇳")
+            st.markdown(f"**🌐 Gujarati Translation:** `{translated_query}` 🇮🇳")
 
         # 📰 Display results
         if articles:
