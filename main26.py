@@ -55,15 +55,14 @@ def highlight_keywords(text, keywords):
     return pattern.sub(r'<mark style="background-color: yellow; color: black;">\1</mark>', text)
 
 def search_news(query, newspaper, date_filter):
-    """ Searches news articles using Pinecone vector search """
+    """ Searches news articles using Pinecone vector search with strict keyword filtering """
     cleaned_query = extract_keywords(query)
     translated_query = translate_to_gujarati(cleaned_query)
-    query_embedding = get_embedding(cleaned_query)  # ✅ Now uses 384-dimension embeddings
+    query_embedding = get_embedding(cleaned_query)
 
     # 🔍 Query Pinecone (Ensure 384-dimension vector)
     results = index.query(vector=query_embedding, top_k=10, namespace=newspaper, include_metadata=True)
 
-    # 📌 Fetch Full Articles
     articles = {}
     for match in results["matches"]:
         metadata = match["metadata"]
@@ -83,13 +82,17 @@ def search_news(query, newspaper, date_filter):
             )
 
             merged_content = {chunk["metadata"]["chunk_index"]: chunk["metadata"]["content_chunk"] for chunk in full_chunks["matches"]}
+            full_text = " ".join([merged_content[i] for i in sorted(merged_content)])
 
-            articles[title] = {
-                "date": date,
-                "newspaper": newspaper.replace("_", " ").title(),
-                "content": " ".join([merged_content[i] for i in sorted(merged_content)]),
-                "link": link
-            }
+            # ✅ Strict filtering: Keep only articles containing the keyword
+            if (cleaned_query.lower() in title.lower() or cleaned_query.lower() in full_text.lower()) or \
+               (translated_query.lower() in title.lower() or translated_query.lower() in full_text.lower()):
+                articles[title] = {
+                    "date": date,
+                    "newspaper": newspaper.replace("_", " ").title(),
+                    "content": full_text,
+                    "link": link
+                }
 
     return articles, cleaned_query, translated_query
 
