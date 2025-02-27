@@ -5,7 +5,7 @@ import time
 import pinecone
 from dotenv import load_dotenv
 from deep_translator import GoogleTranslator
-from sentence_transformers import SentenceTransformer  # ✅ Correct embedding model
+from sentence_transformers import SentenceTransformer  # ✅ Use MiniLM for embeddings
 
 # 🔐 Load API Keys
 load_dotenv()
@@ -15,7 +15,7 @@ PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 pc = pinecone.Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index("news2")
 
-# 🚀 Load Correct Embedding Model (384 dimensions)
+# 🚀 Load MiniLM Embedding Model (384 dimensions)
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # 🚫 Stopwords for keyword extraction
@@ -43,8 +43,8 @@ def translate_to_gujarati(text):
     return text  # Fallback to original text
 
 def get_embedding(text):
-    """ Generate text embeddings using Sentence Transformers (384 dimension) """
-    return embedding_model.encode(text).tolist()  # ✅ Correct dimension
+    """ Generate text embeddings using Sentence Transformers (384 dimensions) """
+    return embedding_model.encode(text).tolist()
 
 def highlight_keywords(text, keywords):
     """ Highlights keywords in text using HTML """
@@ -54,33 +54,23 @@ def highlight_keywords(text, keywords):
     pattern = re.compile(r'\b(' + '|'.join(map(re.escape, words)) + r')\b', re.IGNORECASE)
     return pattern.sub(r'<mark style="background-color: yellow; color: black;">\1</mark>', text)
 
-def search_news(query, newspaper, date_filter):
+def search_news(query, newspaper):
     """ Searches news articles using Pinecone vector search with improved keyword matching """
     cleaned_query = extract_keywords(query)
     translated_query = translate_to_gujarati(cleaned_query)
     query_embedding = get_embedding(cleaned_query)
 
-    # 🔍 Query Pinecone (Ensure 384-dimension vector)
-    results = index.query(vector=query_embedding, top_k=10, namespace=newspaper, include_metadata=True)
+    # 🔍 Query Pinecone with correct namespace (384-dimension vector)
+    results = index.query(vector=query_embedding, top_k=5, namespace=newspaper, include_metadata=True)
 
     articles = {}
-    
-    # 🛠 Debug: Print retrieved metadata
-    print("🔍 Pinecone Query Results:")
-    for match in results["matches"]:
-        print(match["metadata"])
-
     for match in results["matches"]:
         metadata = match["metadata"]
         title, date, link = metadata["title"], metadata["date"], metadata.get("link", "")
-
-        # Skip non-matching dates
-        if date_filter and date != date_filter:
-            continue  
-
+        
         if title not in articles:
             full_chunks = index.query(
-                vector=[0] * 384,  # ✅ Dummy vector now 384-dimension
+                vector=[0] * 384,  # ✅ Dummy vector (384-dimension)
                 top_k=100,
                 namespace=newspaper,
                 include_metadata=True,
@@ -90,14 +80,12 @@ def search_news(query, newspaper, date_filter):
             merged_content = {chunk["metadata"]["chunk_index"]: chunk["metadata"]["content_chunk"] for chunk in full_chunks["matches"]}
             full_text = " ".join([merged_content[i] for i in sorted(merged_content)])
 
-            # ✅ Improved Filtering: Partial Match Allowed
-            if any(word in title.lower() or word in full_text.lower() for word in cleaned_query.split()):
-                articles[title] = {
-                    "date": date,
-                    "newspaper": newspaper.replace("_", " ").title(),
-                    "content": full_text,
-                    "link": link
-                }
+            articles[title] = {
+                "date": date,
+                "newspaper": newspaper.replace("_", " ").title(),
+                "content": full_text,
+                "link": link
+            }
 
     return articles, cleaned_query, translated_query
 
@@ -107,61 +95,41 @@ st.set_page_config(page_title="Gujarati News Bot", page_icon="📰", layout="cen
 st.markdown("<h1 style='text-align: center;'>📰 Gujarati News Bot</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;'>Ask about news articles in English or Gujarati.</p>", unsafe_allow_html=True)
 
-# 📜 Chat History
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hello! Ask me about news articles by keyword, date, and newspaper."}]
+user_query = st.text_input("🔎 Ask me about news articles...")
 
-# Display chat history
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+if st.button("Search News"):
+    if user_query:
+        # Detect newspaper
+        newspaper = None
+        for paper in NEWSPAPER_NAMESPACES.keys():
+            if paper in user_query.lower():
+                newspaper = NEWSPAPER_NAMESPACES[paper]
+                break
 
-# 🎤 User Input
-user_input = st.chat_input("Ask me about news articles...")
-
-if user_input:
-    st.session_state.messages.append({"role": "user", "content": user_input})
-
-    # Extract date & newspaper
-    date_match = re.search(r"\d{4}-\d{2}-\d{2}", user_input)
-    date_filter = date_match.group(0) if date_match else None
-
-    newspaper = None
-    for paper in NEWSPAPER_NAMESPACES.keys():
-        if paper in user_input.lower():
-            newspaper = NEWSPAPER_NAMESPACES[paper]
-            break
-
-    if not newspaper:
-        response = "⚠️ Please mention a newspaper (Gujarat Samachar, Divya Bhaskar, Sandesh)."
-    else:
-        with st.spinner("Searching news..."):
-            articles, cleaned_query, translated_query = search_news(user_input, newspaper, date_filter)
-
-        # Display search details
-        st.markdown(f"**🔑 Keywords Used:** `{cleaned_query}`")
-        if translated_query and translated_query != cleaned_query:
-            st.markdown(f"**🌐 Gujarati Translation:** `{translated_query}` 🇮🇳")
-
-        # 📰 Display results
-        if articles:
-            response = "✅ **Search Results**"
-            for title, details in articles.items():
-                highlighted_title = highlight_keywords(title, translated_query)
-                highlighted_content = highlight_keywords(details["content"], translated_query)
-
-                with st.expander(f"📌 {highlighted_title}"):
-                    st.markdown(f"📅 **Date:** {details['date']}")
-                    st.markdown(f"🗞 **Newspaper:** {details['newspaper']}")
-                    if details["link"]:
-                        st.markdown(f"🔗 [Read More]({details['link']})")
-                    st.write(f"📜 **Full Article:**\n{highlighted_content}")
+        if not newspaper:
+            st.warning("⚠️ Please mention a newspaper (Gujarat Samachar, Divya Bhaskar, Sandesh).")
         else:
-            response = "❌ No matching news articles found."
+            with st.spinner("Searching news..."):
+                articles, cleaned_query, translated_query = search_news(user_query, newspaper)
 
-    # 💬 Store Response in Chat History
-    st.session_state.messages.append({"role": "assistant", "content": response})
+            st.markdown(f"**🔑 Keywords Used:** `{cleaned_query}`")
+            if translated_query and translated_query != cleaned_query:
+                st.markdown(f"**🌐 Gujarati Translation:** `{translated_query}` 🇮🇳")
 
-    # 💡 Display Response
-    with st.chat_message("assistant"):
-        st.markdown(response)
+            # 📰 Display results
+            if articles:
+                for title, details in articles.items():
+                    highlighted_title = highlight_keywords(title, translated_query)
+                    highlighted_content = highlight_keywords(details["content"], translated_query)
+
+                    st.markdown(f"""
+                    <div style="background-color:#f9f9f9; padding:15px; border-radius:8px; box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); margin-bottom: 15px;">
+                        <h3>{highlighted_title}</h3>
+                        <p><strong>📅 Date:</strong> {details['date']}</p>
+                        <p><strong>🗞 Newspaper:</strong> {details['newspaper']}</p>
+                        <p>{highlighted_content}</p>
+                        <p><a href="{details['link']}" target="_blank" style="background-color: #333; color: white; padding: 5px 10px; text-decoration: none; border-radius: 5px;">🔗 Read More</a></p>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.warning("⚠️ No matching news articles found.")
