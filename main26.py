@@ -69,7 +69,7 @@ def search_news(query, namespace):
     vector_results = index.query(vector=query_embedding, top_k=10, include_metadata=True, namespace=namespace)
     
     # Log results
-    st.write(f"🛠️ Debug: Pinecone Raw Results - {vector_results}")
+    #st.write(f"🛠️ Debug: Pinecone Raw Results - {vector_results}")
     
     return vector_results.get("matches", []), cleaned_query, translated_query
 
