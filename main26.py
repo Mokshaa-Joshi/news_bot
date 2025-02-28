@@ -17,7 +17,7 @@ client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 # Initialize Pinecone
 pc = pinecone.Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index("news3")
+index = pc.Index("newsbot")
 
 STOPWORDS = {"news", "give", "me", "about", "on", "the", "is", "of", "for", "and", "with", "to", "in", "a"}
 
@@ -63,35 +63,56 @@ def search_news(query, namespace):
     return vector_results["matches"], cleaned_query, translated_query
 
 # Streamlit UI Configuration
-st.set_page_config(page_title="Gujarati News Bot", page_icon="📰", layout="centered")
+st.set_page_config(page_title="Gujarati News Chatbot", page_icon="📰", layout="wide")
 
 st.markdown("""
-    <h1 style='text-align: center;'>📰 Gujarati News Bot</h1>
-    <p style='text-align: center;'>Enter your query in English or Gujarati and get the latest news instantly.</p>
+    <style>
+        .chat-container {
+            background-color: #f0f2f5;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .chat-bubble {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 80%;
+            margin-bottom: 10px;
+        }
+    </style>
     """, unsafe_allow_html=True)
 
-# Newspaper selection
+st.markdown("""
+    <h1 style='text-align: center;'>📰 Gujarati News Chatbot</h1>
+    <p style='text-align: center;'>Chat with our bot to get the latest news updates in Gujarati.</p>
+    """, unsafe_allow_html=True)
+
+# Chatbot UI
 selected_newspaper = st.selectbox("🗞️ Select Newspaper:", list(NEWSPAPER_OPTIONS.keys()))
-user_query = st.text_input("🔎 Enter your query (English or Gujarati):")
+st.write("💬 Type your query below:")
+chat_input = st.text_input("You:", placeholder="Enter your query here...")
 
 if st.button("Search News"):
-    if user_query:
+    if chat_input:
         with st.spinner("Fetching news... Please wait."):
             time.sleep(1)  # Simulating processing delay
-            results, cleaned_query, translated_query = search_news(user_query, NEWSPAPER_OPTIONS[selected_newspaper])
-
-        st.markdown(f"**🔑 Search Keywords:** `{cleaned_query}`")
+            results, cleaned_query, translated_query = search_news(chat_input, NEWSPAPER_OPTIONS[selected_newspaper])
+        
+        st.markdown(f"<div class='chat-bubble'><strong>🧠 Bot:</strong> Searching news for '{chat_input}'...</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='chat-bubble'><strong>🔑 Keywords:</strong> {cleaned_query}</div>", unsafe_allow_html=True)
         if translated_query and translated_query != cleaned_query:
-            st.markdown(f"**🌐 Gujarati Translation:** `{translated_query}` 🇮🇳")
+            st.markdown(f"<div class='chat-bubble'><strong>🌐 Gujarati Translation:</strong> {translated_query} 🇮🇳</div>", unsafe_allow_html=True)
 
         if results:
             for news in results:
                 metadata = news["metadata"]
                 highlighted_title = highlight_keywords(metadata["title"], translated_query)
                 highlighted_content = highlight_keywords(metadata["content"], translated_query)
-
-                st.markdown("""
-                <div style="background-color: #d9e2ec; padding: 15px; border-radius: 8px; box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); margin-bottom: 15px; color: black;">
+                
+                st.markdown(f"""
+                <div class="chat-container">
                     <h3>{highlighted_title}</h3>
                     <p><strong>📅 Date:</strong> {metadata['date']}</p>
                     <p>{highlighted_content}</p>
@@ -104,4 +125,4 @@ if st.button("Search News"):
                 
                 st.markdown("</div>", unsafe_allow_html=True)
         else:
-            st.warning("⚠️ No news found matching your query.")
+            st.markdown("<div class='chat-bubble' style='background-color: red;'>⚠️ No news found matching your query.</div>", unsafe_allow_html=True)
