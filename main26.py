@@ -17,7 +17,7 @@ client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 # Initialize Pinecone
 pc = pinecone.Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index("news")
+index = pc.Index("newsbot")
 
 STOPWORDS = {"news", "give", "me", "about", "on", "the", "is", "of", "for", "and", "with", "to", "in", "a"}
 
@@ -88,10 +88,35 @@ def search_news(query, newspaper):
             "title": title,
             "content": full_content,
             "date": metadata["date"],
-            "link": metadata["link"]
+            "link": metadata.get("link", "No Link Available"),  # Handle missing 'link'
+            "source": newspaper  # Store the newspaper name
         })
 
     return merged_articles, cleaned_query, translated_query
+
+def summarize_and_rerank(articles, query):
+    """ Uses OpenAI GPT-4 to re-rank and summarize search results. """
+    if not articles:
+        return "No relevant articles found."
+
+    formatted_articles = "\n\n".join([
+        f"Title: {article['title']}\n"
+        f"Date: {article['date']}\n"
+        f"Content: {article['content']}\n"
+        f"Source: {article['source']}\n"
+        f"Link: {article['link']}"
+        for article in articles
+    ])
+
+    response = client.chat.completions.create(
+        model="gpt-4-turbo",
+        messages=[
+            {"role": "system", "content": "Summarize and rank the following news articles based on relevance to the query."},
+            {"role": "user", "content": f"Query: {query}\n\n{formatted_articles}"}
+        ]
+    )
+
+    return response.choices[0].message.content.strip()
 
 # Streamlit UI Configuration
 st.set_page_config(page_title="Gujarati News Bot", page_icon="📰", layout="centered")
@@ -115,6 +140,9 @@ if st.button("Search News"):
             st.markdown(f"**🌐 Gujarati Translation:** `{translated_query}` 🇮🇳")
 
         if results:
+            summary = summarize_and_rerank(results, user_query)
+            st.markdown(f"### 📌 Summary of Results:\n{summary}")
+
             for news in results:
                 highlighted_title = highlight_keywords(news["title"], translated_query)
                 highlighted_content = highlight_keywords(news["content"], translated_query)
@@ -123,6 +151,7 @@ if st.button("Search News"):
                 <div style="background-color: #d9e2ec; padding: 15px; border-radius: 8px; box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); margin-bottom: 15px; color: black;">
                     <h3>{highlighted_title}</h3>
                     <p><strong>📅 Date:</strong> {news['date']}</p>
+                    <p><strong>📰 Source:</strong> {news['source']}</p>
                     <p>{highlighted_content}</p>
                     <p><a href="{news['link']}" target="_blank" style="display: inline-block; padding: 5px 10px; background-color: #333333; color: white !important; text-decoration: none; border-radius: 5px; font-size: 14px;">🔗 Read More</a></p>
                 </div>
