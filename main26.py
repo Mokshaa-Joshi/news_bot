@@ -91,7 +91,7 @@ st.markdown("""
 
 # Chatbot UI
 selected_newspaper = st.selectbox("🗞️ Select Newspaper:", list(NEWSPAPER_OPTIONS.keys()))
-st.write("💬 Type your query below:")
+st.write("💬 Type your query(in English or Gujarati) below:")
 chat_input = st.text_input("You:", placeholder="Enter your query(in English or Gujarati) here...")
 
 if st.button("Search News"):
