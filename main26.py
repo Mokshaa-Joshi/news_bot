@@ -17,7 +17,7 @@ client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 # Initialize Pinecone
 pc = pinecone.Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index("news3")
+index = pc.Index("newsbot")
 
 STOPWORDS = {"news", "give", "me", "about", "on", "the", "is", "of", "for", "and", "with", "to", "in", "a"}
 
@@ -90,13 +90,18 @@ if st.button("Search News"):
                 highlighted_title = highlight_keywords(metadata["title"], translated_query)
                 highlighted_content = highlight_keywords(metadata["content"], translated_query)
 
-                st.markdown(f"""
+                st.markdown("""
                 <div style="background-color: #d9e2ec; padding: 15px; border-radius: 8px; box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); margin-bottom: 15px; color: black;">
                     <h3>{highlighted_title}</h3>
                     <p><strong>📅 Date:</strong> {metadata['date']}</p>
                     <p>{highlighted_content}</p>
-                    <p><a href="{metadata['link']}" target="_blank" style="background-color: #333333; color: white; padding: 5px 10px; text-decoration: none; border-radius: 5px; font-size: 14px;">🔗 Read More</a></p>
-                </div>
                 """, unsafe_allow_html=True)
+                
+                if "link" in metadata and metadata["link"]:
+                    st.markdown(f"""
+                    <p><a href="{metadata['link']}" target="_blank" style="background-color: #333333; color: white; padding: 5px 10px; text-decoration: none; border-radius: 5px; font-size: 14px;">🔗 Read More</a></p>
+                    """, unsafe_allow_html=True)
+                
+                st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.warning("⚠️ No news found matching your query.")
