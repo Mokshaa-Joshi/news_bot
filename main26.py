@@ -115,6 +115,7 @@ if st.button("Search News"):
                 <div class="chat-container">
                     <h3>{highlighted_title}</h3>
                     <p><strong>📅 Date:</strong> {metadata['date']}</p>
+                     <p><strong>Source:</strong> {selected_newspaper}</p>
                     <p>{highlighted_content}</p>
                 """, unsafe_allow_html=True)
                 
