@@ -34,9 +34,11 @@ def extract_keywords(text):
     return " ".join(keywords)
 
 def translate_to_gujarati(text):
-    """ Translates text to Gujarati using DeepTranslate """
+    """ Translates text to Gujarati sentence-wise for better accuracy """
     try:
-        return GoogleTranslator(source='auto', target='gu').translate(text)
+        sentences = text.split(". ")
+        translated_sentences = [GoogleTranslator(source='auto', target='gu').translate(sentence) for sentence in sentences]
+        return ". ".join(translated_sentences)
     except Exception as e:
         st.error(f"Translation error: {e}")
     return text  # Fallback to original text
@@ -55,8 +57,9 @@ def highlight_keywords(text, keywords):
     return pattern.sub(r'<mark style="background-color: yellow; color: black;">\1</mark>', text)
 
 def merge_article_chunks(chunks):
-    """ Merges all content chunks of an article into a single string """
-    return " ".join([chunk["metadata"]["content_chunk"] for chunk in chunks])
+    """ Merges all content chunks of an article into a single string in the correct order """
+    sorted_chunks = sorted(chunks, key=lambda x: x["metadata"]["chunk_index"])
+    return " ".join([chunk["metadata"]["content_chunk"] for chunk in sorted_chunks])
 
 def search_news(query, newspaper):
     """ Searches news articles using Pinecone vector search """
@@ -64,13 +67,21 @@ def search_news(query, newspaper):
 
     cleaned_query = extract_keywords(query)
     translated_query = translate_to_gujarati(cleaned_query)
-    query_embedding = get_embedding(cleaned_query)
 
-    vector_results = index.query(vector=query_embedding, top_k=10, include_metadata=True, namespace=namespace)
+    # Generate embeddings for both original and translated query for better accuracy
+    original_embedding = get_embedding(cleaned_query)
+    translated_embedding = get_embedding(translated_query)
+
+    # Perform vector search using both embeddings
+    vector_results1 = index.query(vector=original_embedding, top_k=5, include_metadata=True, namespace=namespace)
+    vector_results2 = index.query(vector=translated_embedding, top_k=5, include_metadata=True, namespace=namespace)
+
+    # Combine results
+    all_results = vector_results1["matches"] + vector_results2["matches"]
 
     # Group articles by title
     articles = {}
-    for result in vector_results["matches"]:
+    for result in all_results:
         metadata = result["metadata"]
         title = metadata["title"]
 
