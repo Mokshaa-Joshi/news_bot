@@ -85,14 +85,14 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.markdown("""
-    <h1 style='text-align: center;'>📰 Gujarati News Chatbot</h1>
-    <p style='text-align: center;'>Chat with our bot to get the latest news updates in Gujarati.</p>
+    <h1 style='text-align: center;'>📰 Gujarati News Search Assistant</h1>
+    <p style='text-align: center;'>Chat with it to get the latest news updates in Gujarati.</p>
     """, unsafe_allow_html=True)
 
 # Chatbot UI
 selected_newspaper = st.selectbox("🗞️ Select Newspaper:", list(NEWSPAPER_OPTIONS.keys()))
 st.write("💬 Type your query below:")
-chat_input = st.text_input("You:", placeholder="Enter your query here...")
+chat_input = st.text_input("You:", placeholder="Enter your query(in English or Gujarati) here...")
 
 if st.button("Search News"):
     if chat_input:
