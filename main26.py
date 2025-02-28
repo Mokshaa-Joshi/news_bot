@@ -58,9 +58,20 @@ def search_news(query, namespace):
     """ Searches news articles using Pinecone vector search """
     cleaned_query = extract_keywords(query)
     translated_query = translate_to_gujarati(cleaned_query)
-    query_embedding = get_embedding(cleaned_query)
-    vector_results = index.query(vector=query_embedding, top_k=5, include_metadata=True, namespace=namespace)
-    return vector_results["matches"], cleaned_query, translated_query
+    query_embedding = get_embedding(translated_query)  # Use Gujarati-translated query
+    
+    # Debugging Output
+    st.write(f"🛠️ Debug: Extracted Keywords - `{cleaned_query}`")
+    st.write(f"🛠️ Debug: Translated Query - `{translated_query}`")
+    st.write(f"🛠️ Debug: Querying Pinecone in namespace `{namespace}`...")
+    st.write(f"🛠️ Debug: Available Namespaces - {index.describe_index_stats()}")
+    
+    vector_results = index.query(vector=query_embedding, top_k=10, include_metadata=True, namespace=namespace)
+    
+    # Log results
+    st.write(f"🛠️ Debug: Pinecone Raw Results - {vector_results}")
+    
+    return vector_results.get("matches", []), cleaned_query, translated_query
 
 # Streamlit UI Configuration
 st.set_page_config(page_title="Gujarati News Chatbot", page_icon="📰", layout="wide")
@@ -91,8 +102,8 @@ st.markdown("""
 
 # Chatbot UI
 selected_newspaper = st.selectbox("🗞️ Select Newspaper:", list(NEWSPAPER_OPTIONS.keys()))
-st.write("💬 Type your query(in English or Gujarati) below:")
-chat_input = st.text_input("You:", placeholder="Enter your query(in English or Gujarati) here...")
+st.write("💬 Type your query (in English or Gujarati) below:")
+chat_input = st.text_input("You:", placeholder="Enter your query here...")
 
 if st.button("Search News"):
     if chat_input:
@@ -101,7 +112,6 @@ if st.button("Search News"):
             results, cleaned_query, translated_query = search_news(chat_input, NEWSPAPER_OPTIONS[selected_newspaper])
         
         st.markdown(f"<div class='chat-bubble'><strong>Bot:</strong> Searching news for '{chat_input}'...</div>", unsafe_allow_html=True)
-        #st.markdown(f"<div class='chat-bubble'><strong>🔑 Keywords:</strong> {cleaned_query}</div>", unsafe_allow_html=True)
         if translated_query and translated_query != cleaned_query:
             st.markdown(f"<div class='chat-bubble'><strong>Gujarati Translation:</strong> {translated_query} 🇮🇳</div>", unsafe_allow_html=True)
 
@@ -115,7 +125,7 @@ if st.button("Search News"):
                 <div class="chat-container">
                     <h3>{highlighted_title}</h3>
                     <p><strong>📅 Date:</strong> {metadata['date']}</p>
-                     <p><strong>Source:</strong> {selected_newspaper}</p>
+                    <p><strong>Source:</strong> {selected_newspaper}</p>
                     <p>{highlighted_content}</p>
                 """, unsafe_allow_html=True)
                 
