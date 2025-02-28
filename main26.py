@@ -100,10 +100,10 @@ if st.button("Search News"):
             time.sleep(1)  # Simulating processing delay
             results, cleaned_query, translated_query = search_news(chat_input, NEWSPAPER_OPTIONS[selected_newspaper])
         
-        st.markdown(f"<div class='chat-bubble'><strong>🧠 Bot:</strong> Searching news for '{chat_input}'...</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='chat-bubble'><strong>🔑 Keywords:</strong> {cleaned_query}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='chat-bubble'><strong>Bot:</strong> Searching news for '{chat_input}'...</div>", unsafe_allow_html=True)
+        #st.markdown(f"<div class='chat-bubble'><strong>🔑 Keywords:</strong> {cleaned_query}</div>", unsafe_allow_html=True)
         if translated_query and translated_query != cleaned_query:
-            st.markdown(f"<div class='chat-bubble'><strong>🌐 Gujarati Translation:</strong> {translated_query} 🇮🇳</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='chat-bubble'><strong>Gujarati Translation:</strong> {translated_query} 🇮🇳</div>", unsafe_allow_html=True)
 
         if results:
             for news in results:
