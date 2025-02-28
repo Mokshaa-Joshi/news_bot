@@ -148,6 +148,7 @@ if st.button("Search News"):
                 <div class="news-card">
                     <h3>{highlighted_title}</h3>
                     <p><strong>📅 Date:</strong> {metadata['date']}</p>
+                    <p><strong>Source:</strong> {metadata['namespace']}</p>
                     <p>{highlighted_content}</p>
                     <p><a href="{metadata['link']}" target="_blank" class="read-more-button">🔗 Read More</a></p>
                 </div>
