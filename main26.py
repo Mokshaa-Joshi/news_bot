@@ -61,10 +61,10 @@ def search_news(query, namespace):
     query_embedding = get_embedding(translated_query)  # Use Gujarati-translated query
     
     # Debugging Output
-    st.write(f"🛠️ Debug: Extracted Keywords - `{cleaned_query}`")
-    st.write(f"🛠️ Debug: Translated Query - `{translated_query}`")
-    st.write(f"🛠️ Debug: Querying Pinecone in namespace `{namespace}`...")
-    st.write(f"🛠️ Debug: Available Namespaces - {index.describe_index_stats()}")
+    #st.write(f"🛠️ Debug: Extracted Keywords - `{cleaned_query}`")
+    #st.write(f"🛠️ Debug: Translated Query - `{translated_query}`")
+    #st.write(f"🛠️ Debug: Querying Pinecone in namespace `{namespace}`...")
+    #st.write(f"🛠️ Debug: Available Namespaces - {index.describe_index_stats()}")
     
     vector_results = index.query(vector=query_embedding, top_k=10, include_metadata=True, namespace=namespace)
     
