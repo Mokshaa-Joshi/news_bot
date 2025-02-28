@@ -17,7 +17,7 @@ client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 # Initialize Pinecone
 pc = pinecone.Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index("newsbot")
+index = pc.Index("news3")
 
 STOPWORDS = {"news", "give", "me", "about", "on", "the", "is", "of", "for", "and", "with", "to", "in", "a"}
 
