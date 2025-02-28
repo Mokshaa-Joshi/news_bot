@@ -74,7 +74,7 @@ st.markdown("""
             box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
         }
         .chat-bubble {
-            background-color: #4CAF50;
+            background-color: #808080;
             color: white;
             padding: 10px;
             border-radius: 10px;
