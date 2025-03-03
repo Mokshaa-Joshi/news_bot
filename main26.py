@@ -12,9 +12,6 @@ load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Initialize OpenAI client (for embeddings)
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
-
 # Initialize Pinecone
 pc = pinecone.Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index("news3")
@@ -30,8 +27,8 @@ NEWSPAPER_OPTIONS = {
 
 def extract_keywords(text):
     words = text.split()
-    keywords = [word for word in words if word.lower() not in STOPWORDS]
-    return " ".join(keywords)
+    keywords = [word.lower() for word in words if word.lower() not in STOPWORDS]
+    return keywords
 
 def translate_to_gujarati(text):
     """ Translates text to Gujarati using DeepTranslate """
@@ -41,37 +38,28 @@ def translate_to_gujarati(text):
         st.error(f"Translation error: {e}")
     return text  # Fallback to original text
 
-def get_embedding(text):
-    """ Generate text embeddings using OpenAI """
-    response = client.embeddings.create(input=text, model="text-embedding-ada-002")
-    return response.data[0].embedding
+def filter_news_by_title(query, namespace):
+    """ Fetches all news articles and filters them based on keyword matches in the title """
+    keywords = extract_keywords(query)
+    translated_keywords = extract_keywords(translate_to_gujarati(query))
+
+    # Fetch all records from Pinecone
+    news_records = index.query(vector=[0]*1536, top_k=100, include_metadata=True, namespace=namespace)["matches"]
+
+    # Filter results based on title keywords
+    filtered_news = [
+        news for news in news_records
+        if any(keyword in news["metadata"]["title"].lower() for keyword in keywords + translated_keywords)
+    ]
+    
+    return filtered_news, keywords, translated_keywords
 
 def highlight_keywords(text, keywords):
     """ Highlights keywords in text using HTML markup """
     if not text or not keywords:
         return text
-    words = keywords.split()
-    pattern = re.compile(r'\b(' + '|'.join(map(re.escape, words)) + r')\b', re.IGNORECASE)
+    pattern = re.compile(r'\b(' + '|'.join(map(re.escape, keywords)) + r')\b', re.IGNORECASE)
     return pattern.sub(r'<mark style="background-color: yellow; color: black;">\1</mark>', text)
-
-def search_news(query, namespace):
-    """ Searches news articles using Pinecone vector search """
-    cleaned_query = extract_keywords(query)
-    translated_query = translate_to_gujarati(cleaned_query)
-    query_embedding = get_embedding(translated_query)  # Use Gujarati-translated query
-    
-    # Debugging Output
-    #st.write(f"🛠️ Debug: Extracted Keywords - `{cleaned_query}`")
-    #st.write(f"🛠️ Debug: Translated Query - `{translated_query}`")
-    #st.write(f"🛠️ Debug: Querying Pinecone in namespace `{namespace}`...")
-    #st.write(f"🛠️ Debug: Available Namespaces - {index.describe_index_stats()}")
-    
-    vector_results = index.query(vector=query_embedding, top_k=10, include_metadata=True, namespace=namespace)
-    
-    # Log results
-    #st.write(f"🛠️ Debug: Pinecone Raw Results - {vector_results}")
-    
-    return vector_results.get("matches", []), cleaned_query, translated_query
 
 # Streamlit UI Configuration
 st.set_page_config(page_title="Gujarati News Chatbot", page_icon="📰", layout="wide")
@@ -109,17 +97,17 @@ if st.button("Search News"):
     if chat_input:
         with st.spinner("Fetching news... Please wait."):
             time.sleep(1)  # Simulating processing delay
-            results, cleaned_query, translated_query = search_news(chat_input, NEWSPAPER_OPTIONS[selected_newspaper])
+            results, cleaned_query, translated_query = filter_news_by_title(chat_input, NEWSPAPER_OPTIONS[selected_newspaper])
         
         st.markdown(f"<div class='chat-bubble'><strong>Bot:</strong> Searching news for '{chat_input}'...</div>", unsafe_allow_html=True)
         if translated_query and translated_query != cleaned_query:
-            st.markdown(f"<div class='chat-bubble'><strong>Gujarati Translation:</strong> {translated_query} 🇮🇳</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='chat-bubble'><strong>Gujarati Translation:</strong> {' '.join(translated_query)} 🇮🇳</div>", unsafe_allow_html=True)
 
         if results:
             for news in results:
                 metadata = news["metadata"]
-                highlighted_title = highlight_keywords(metadata["title"], translated_query)
-                highlighted_content = highlight_keywords(metadata["content"], translated_query)
+                highlighted_title = highlight_keywords(metadata["title"], cleaned_query + translated_query)
+                highlighted_content = highlight_keywords(metadata["content"], cleaned_query + translated_query)
                 
                 st.markdown(f"""
                 <div class="chat-container">
