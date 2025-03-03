@@ -3,19 +3,18 @@ import os
 import re
 import time
 import pinecone
-import openai
 from dotenv import load_dotenv
 from deep_translator import GoogleTranslator
 
 # Load API keys
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Initialize Pinecone
 pc = pinecone.Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index("news3")
 
+# Stopwords to exclude from queries
 STOPWORDS = {"news", "give", "me", "about", "on", "the", "is", "of", "for", "and", "with", "to", "in", "a"}
 
 # Newspaper options
@@ -26,36 +25,46 @@ NEWSPAPER_OPTIONS = {
 }
 
 def extract_keywords(text):
+    """Extracts keywords from the query, excluding stopwords."""
     words = text.split()
     keywords = [word.lower() for word in words if word.lower() not in STOPWORDS]
     return keywords
 
-def translate_to_gujarati(text):
-    """ Translates text to Gujarati using DeepTranslate """
-    try:
-        return GoogleTranslator(source='auto', target='gu').translate(text)
-    except Exception as e:
-        st.error(f"Translation error: {e}")
-    return text  # Fallback to original text
+def translate_keywords(keywords):
+    """Translates keywords to Gujarati using GoogleTranslator."""
+    translated_keywords = []
+    for keyword in keywords:
+        try:
+            translated = GoogleTranslator(source='auto', target='gu').translate(keyword)
+            translated_keywords.append(translated.lower())
+        except Exception as e:
+            st.error(f"Translation error for '{keyword}': {e}")
+    return translated_keywords
 
 def filter_news_by_title(query, namespace):
-    """ Fetches all news articles and filters them based on keyword matches in the title """
+    """Fetches news articles and filters them based on keyword matches in the title."""
+    # Extract keywords from the query
     keywords = extract_keywords(query)
-    translated_keywords = extract_keywords(translate_to_gujarati(query))
-
+    
+    # Translate keywords to Gujarati
+    translated_keywords = translate_keywords(keywords)
+    
+    # Combine original and translated keywords for searching
+    all_keywords = keywords + translated_keywords
+    
     # Fetch all records from Pinecone
     news_records = index.query(vector=[0]*1536, top_k=100, include_metadata=True, namespace=namespace)["matches"]
-
+    
     # Filter results based on title keywords
     filtered_news = [
         news for news in news_records
-        if any(keyword in news["metadata"]["title"].lower() for keyword in keywords + translated_keywords)
+        if any(keyword in news["metadata"]["title"].lower() for keyword in all_keywords)
     ]
     
     return filtered_news, keywords, translated_keywords
 
 def highlight_keywords(text, keywords):
-    """ Highlights keywords in text using HTML markup """
+    """Highlights keywords in text using HTML markup."""
     if not text or not keywords:
         return text
     pattern = re.compile(r'\b(' + '|'.join(map(re.escape, keywords)) + r')\b', re.IGNORECASE)
