@@ -30,15 +30,24 @@ def extract_keywords(text):
     keywords = [word.lower() for word in words if word.lower() not in STOPWORDS]
     return keywords
 
+def is_proper_noun(word):
+    """Checks if a word is a proper noun (e.g., starts with a capital letter)."""
+    return word.istitle() or word.isupper()
+
 def translate_keywords(keywords):
-    """Translates keywords to Gujarati using GoogleTranslator."""
+    """Translates keywords to Gujarati using GoogleTranslator, skipping proper nouns."""
     translated_keywords = []
     for keyword in keywords:
-        try:
-            translated = GoogleTranslator(source='auto', target='gu').translate(keyword)
-            translated_keywords.append(translated.lower())
-        except Exception as e:
-            st.error(f"Translation error for '{keyword}': {e}")
+        if is_proper_noun(keyword):
+            # Skip translation for proper nouns
+            translated_keywords.append(keyword.lower())
+        else:
+            try:
+                translated = GoogleTranslator(source='auto', target='gu').translate(keyword)
+                translated_keywords.append(translated.lower())
+            except Exception as e:
+                st.error(f"Translation error for '{keyword}': {e}")
+                translated_keywords.append(keyword.lower())  # Fallback to original keyword
     return translated_keywords
 
 def filter_news_by_title(query, namespace):
@@ -46,7 +55,7 @@ def filter_news_by_title(query, namespace):
     # Extract keywords from the query
     keywords = extract_keywords(query)
     
-    # Translate keywords to Gujarati
+    # Translate keywords to Gujarati (skipping proper nouns)
     translated_keywords = translate_keywords(keywords)
     
     # Combine original and translated keywords for searching
