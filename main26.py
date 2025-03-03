@@ -33,7 +33,7 @@ def extract_keywords(text):
 def translate_to_gujarati(text):
     """ Translates text to Gujarati using DeepTranslate """
     try:
-        return GoogleTranslator(source='auto', target='gu').translate(text)
+        return GoogleTranslator(source='auto', target='gu').translate(f'"{text}"')
     except Exception as e:
         st.error(f"Translation error: {e}")
     return text  # Fallback to original text
