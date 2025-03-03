@@ -35,9 +35,15 @@ def is_proper_noun(word):
     return word.istitle() or word.isupper()
 
 def translate_text(text, target_lang="gu"):
-    """Translates text to the target language using GoogleTranslator."""
+    """Translates text to the target language using GoogleTranslator, excluding stopwords."""
     try:
-        return GoogleTranslator(source='auto', target=target_lang).translate(text)
+        # Split the text into words and filter out stopwords
+        words = text.split()
+        filtered_words = [word for word in words if word.lower() not in STOPWORDS]
+        filtered_text = " ".join(filtered_words)
+        
+        # Translate the filtered text
+        return GoogleTranslator(source='auto', target=target_lang).translate(filtered_text)
     except Exception as e:
         st.error(f"Translation error: {e}")
         return text  # Fallback to original text
@@ -57,7 +63,7 @@ def filter_news_by_title(query, namespace):
     # Extract keywords from the query
     keywords = extract_keywords(query)
     
-    # Translate the entire query to Gujarati
+    # Translate the entire query to Gujarati (excluding stopwords)
     translated_query = translate_text(query)
     translated_keywords = extract_keywords(translated_query)
     
