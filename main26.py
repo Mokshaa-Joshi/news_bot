@@ -49,14 +49,16 @@ def translate_text(text, target_lang="gu"):
         return text  # Fallback to original text
 
 def convert_proper_noun_to_gujarati(word):
-    """Converts proper nouns to their Gujarati equivalent."""
-    # Add a mapping for known proper nouns
-    proper_noun_mapping = {
-        "trump": "ટ્રમ્પ",
-        "modi": "મોદી",
-        "gujarat": "ગુજરાત"
-    }
-    return proper_noun_mapping.get(word.lower(), word)
+    """Converts proper nouns to their Gujarati equivalent using GoogleTranslator."""
+    if is_proper_noun(word):
+        try:
+            # Attempt to translate the word using GoogleTranslator
+            return GoogleTranslator(source='auto', target='gu').translate(word)
+        except Exception as e:
+            st.error(f"Translation error for '{word}': {e}")
+            return word  # Fallback to original word
+    else:
+        return word  # Return the word as-is if it's not a proper noun
 
 def filter_news_by_title(query, namespace):
     """Fetches news articles and filters them based on keyword matches in the title."""
