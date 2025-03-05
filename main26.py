@@ -37,54 +37,50 @@ def is_proper_noun(word):
 def translate_text(text, target_lang="gu"):
     """Translates text to the target language using GoogleTranslator, excluding stopwords."""
     try:
-        # Split the text into words and filter out stopwords
         words = text.split()
         filtered_words = [word for word in words if word.lower() not in STOPWORDS]
         filtered_text = " ".join(filtered_words)
-        
-        # Translate the filtered text
         return GoogleTranslator(source='auto', target=target_lang).translate(filtered_text)
     except Exception as e:
         st.error(f"Translation error: {e}")
-        return text  # Fallback to original text
+        return text
 
 def convert_proper_noun_to_gujarati(word):
     """Converts proper nouns to their Gujarati equivalent using GoogleTranslator."""
     if is_proper_noun(word):
         try:
-            # Attempt to translate the word using GoogleTranslator
             return GoogleTranslator(source='auto', target='gu').translate(word)
         except Exception as e:
             st.error(f"Translation error for '{word}': {e}")
-            return word  # Fallback to original word
+            return word
     else:
-        return word  # Return the word as-is if it's not a proper noun
+        return word
 
 def filter_news_by_title(query, namespace):
-    """Fetches news articles and filters them based on keyword matches in the title."""
-    # Extract keywords from the query
+    """Fetches news articles and prioritizes exact phrase matches before displaying keyword-based matches."""
     keywords = extract_keywords(query)
-    
-    # Translate the entire query to Gujarati (excluding stopwords)
     translated_query = translate_text(query)
     translated_keywords = extract_keywords(translated_query)
     
-    # Convert proper nouns to Gujarati
     proper_noun_keywords = [convert_proper_noun_to_gujarati(keyword) for keyword in keywords]
-    
-    # Combine original, translated, and proper noun keywords for searching
     all_keywords = keywords + translated_keywords + proper_noun_keywords
-    
+
     # Fetch all records from Pinecone
     news_records = index.query(vector=[0]*1536, top_k=100, include_metadata=True, namespace=namespace)["matches"]
     
-    # Filter results based on title keywords
-    filtered_news = [
+    # Prioritize exact phrase matches
+    exact_phrase_matches = [
         news for news in news_records
-        if any(keyword in news["metadata"]["title"].lower() for keyword in all_keywords)
+        if query in news["metadata"]["title"] or translated_query in news["metadata"]["title"]
     ]
-    
-    return filtered_news, keywords, translated_keywords, proper_noun_keywords
+
+    # Other keyword-based matches
+    keyword_matches = [
+        news for news in news_records
+        if any(keyword in news["metadata"]["title"].lower() for keyword in all_keywords) and news not in exact_phrase_matches
+    ]
+
+    return exact_phrase_matches + keyword_matches, keywords, translated_keywords, proper_noun_keywords
 
 def highlight_keywords(text, keywords):
     """Highlights keywords in text using HTML markup."""
@@ -120,7 +116,6 @@ st.markdown("""
     <p style='text-align: center;'>Chat with it to get the latest news updates in Gujarati.</p>
     """, unsafe_allow_html=True)
 
-# Chatbot UI
 selected_newspaper = st.selectbox("🗞️ Select Newspaper:", list(NEWSPAPER_OPTIONS.keys()))
 st.write("💬 Type your query (in English or Gujarati) below:")
 st.write("💬 Gujarati is preferred")
@@ -129,7 +124,7 @@ chat_input = st.text_input("You:", placeholder="Enter your query here...")
 if st.button("Search News"):
     if chat_input:
         with st.spinner("Fetching news... Please wait."):
-            time.sleep(1)  # Simulating processing delay
+            time.sleep(1)
             results, cleaned_query, translated_query, proper_noun_keywords = filter_news_by_title(chat_input, NEWSPAPER_OPTIONS[selected_newspaper])
         
         st.markdown(f"<div class='chat-bubble'><strong>Bot:</strong> Searching news for '{chat_input}'...</div>", unsafe_allow_html=True)
@@ -154,7 +149,7 @@ if st.button("Search News"):
                 
                 if "link" in metadata and metadata["link"]:
                     st.markdown(f"""
-                    <p><a href="{metadata['link']}" target="_blank" style="background-color: #333333; color: white; padding: 5px 10px; text-decoration: none; border-radius: 5px; font-size: 14px;">🔗 Read More</a></p>
+                    <p><a href="{metadata['link']}" target="_blank">🔗 Read More</a></p>
                     """, unsafe_allow_html=True)
                 
                 st.markdown("</div>", unsafe_allow_html=True)
