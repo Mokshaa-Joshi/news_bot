@@ -34,46 +34,32 @@ def is_proper_noun(word):
     """Checks if a word is a proper noun (e.g., starts with a capital letter)."""
     return word.istitle() or word.isupper()
 
-def translate_text(text, target_lang="gu"):
-    """Translates text to the target language using GoogleTranslator, excluding stopwords."""
-    try:
-        # Split the text into words and filter out stopwords
-        words = text.split()
-        filtered_words = [word for word in words if word.lower() not in STOPWORDS]
-        filtered_text = " ".join(filtered_words)
-        
-        # Translate the filtered text
-        return GoogleTranslator(source='auto', target=target_lang).translate(filtered_text)
-    except Exception as e:
-        st.error(f"Translation error: {e}")
-        return text  # Fallback to original text
-
-def convert_proper_noun_to_gujarati(word):
-    """Converts proper nouns to their Gujarati equivalent using GoogleTranslator."""
-    if is_proper_noun(word):
-        try:
-            # Attempt to translate the word using GoogleTranslator
-            return GoogleTranslator(source='auto', target='gu').translate(word)
-        except Exception as e:
-            st.error(f"Translation error for '{word}': {e}")
-            return word  # Fallback to original word
-    else:
-        return word  # Return the word as-is if it's not a proper noun
+def translate_keywords(keywords):
+    """Translates keywords to Gujarati using GoogleTranslator, skipping proper nouns."""
+    translated_keywords = []
+    for keyword in keywords:
+        if is_proper_noun(keyword):
+            # Skip translation for proper nouns
+            translated_keywords.append(keyword.lower())
+        else:
+            try:
+                translated = GoogleTranslator(source='auto', target='gu').translate(keyword)
+                translated_keywords.append(translated.lower())
+            except Exception as e:
+                st.error(f"Translation error for '{keyword}': {e}")
+                translated_keywords.append(keyword.lower())  # Fallback to original keyword
+    return translated_keywords
 
 def filter_news_by_title(query, namespace):
     """Fetches news articles and filters them based on keyword matches in the title."""
     # Extract keywords from the query
     keywords = extract_keywords(query)
     
-    # Translate the entire query to Gujarati (excluding stopwords)
-    translated_query = translate_text(query)
-    translated_keywords = extract_keywords(translated_query)
+    # Translate keywords to Gujarati (skipping proper nouns)
+    translated_keywords = translate_keywords(keywords)
     
-    # Convert proper nouns to Gujarati
-    proper_noun_keywords = [convert_proper_noun_to_gujarati(keyword) for keyword in keywords]
-    
-    # Combine original, translated, and proper noun keywords for searching
-    all_keywords = keywords + translated_keywords + proper_noun_keywords
+    # Combine original and translated keywords for searching
+    all_keywords = keywords + translated_keywords
     
     # Fetch all records from Pinecone
     news_records = index.query(vector=[0]*1536, top_k=100, include_metadata=True, namespace=namespace)["matches"]
@@ -84,7 +70,7 @@ def filter_news_by_title(query, namespace):
         if any(keyword in news["metadata"]["title"].lower() for keyword in all_keywords)
     ]
     
-    return filtered_news, keywords, translated_keywords, proper_noun_keywords
+    return filtered_news, keywords, translated_keywords
 
 def highlight_keywords(text, keywords):
     """Highlights keywords in text using HTML markup."""
@@ -123,26 +109,23 @@ st.markdown("""
 # Chatbot UI
 selected_newspaper = st.selectbox("🗞️ Select Newspaper:", list(NEWSPAPER_OPTIONS.keys()))
 st.write("💬 Type your query (in English or Gujarati) below:")
-st.write("💬 Gujarati is preferred")
 chat_input = st.text_input("You:", placeholder="Enter your query here...")
 
 if st.button("Search News"):
     if chat_input:
         with st.spinner("Fetching news... Please wait."):
             time.sleep(1)  # Simulating processing delay
-            results, cleaned_query, translated_query, proper_noun_keywords = filter_news_by_title(chat_input, NEWSPAPER_OPTIONS[selected_newspaper])
+            results, cleaned_query, translated_query = filter_news_by_title(chat_input, NEWSPAPER_OPTIONS[selected_newspaper])
         
         st.markdown(f"<div class='chat-bubble'><strong>Bot:</strong> Searching news for '{chat_input}'...</div>", unsafe_allow_html=True)
-        if translated_query:
+        if translated_query and translated_query != cleaned_query:
             st.markdown(f"<div class='chat-bubble'><strong>Gujarati Translation:</strong> {' '.join(translated_query)} 🇮🇳</div>", unsafe_allow_html=True)
-        if proper_noun_keywords:
-            st.markdown(f"<div class='chat-bubble'><strong>Proper Noun Conversion:</strong> {' '.join(proper_noun_keywords)}</div>", unsafe_allow_html=True)
 
         if results:
             for news in results:
                 metadata = news["metadata"]
-                highlighted_title = highlight_keywords(metadata["title"], cleaned_query + translated_query + proper_noun_keywords)
-                highlighted_content = highlight_keywords(metadata["content"], cleaned_query + translated_query + proper_noun_keywords)
+                highlighted_title = highlight_keywords(metadata["title"], cleaned_query + translated_query)
+                highlighted_content = highlight_keywords(metadata["content"], cleaned_query + translated_query)
                 
                 st.markdown(f"""
                 <div class="chat-container">
