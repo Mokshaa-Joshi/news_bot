@@ -30,12 +30,21 @@ def extract_keywords(text):
     keywords = [word.lower() for word in words if word.lower() not in STOPWORDS]
     return keywords
 
+def is_proper_noun(word):
+    """Checks if a word is a proper noun (e.g., starts with a capital letter)."""
+    return word.istitle() or word.isupper()
+
 def translate_text(text, target_lang="gu"):
     """Translates text to the target language using GoogleTranslator, excluding stopwords."""
     try:
         words = text.split()
         filtered_words = [word for word in words if word.lower() not in STOPWORDS]
         filtered_text = " ".join(filtered_words)
+        
+        # Avoid translating if the word is a proper noun
+        if is_proper_noun(filtered_text):
+            return filtered_text  # Return original if it's a proper noun
+        
         return GoogleTranslator(source='auto', target=target_lang).translate(filtered_text)
     except Exception as e:
         st.error(f"Translation error: {e}")
@@ -44,28 +53,26 @@ def translate_text(text, target_lang="gu"):
 def convert_proper_noun_to_gujarati(word):
     """Converts proper nouns to their Gujarati equivalent using GoogleTranslator."""
     try:
-        return GoogleTranslator(source='auto', target='gu').translate(word)
+        # Translate only if it's a proper noun
+        if is_proper_noun(word):
+            return GoogleTranslator(source='auto', target='gu').translate(word)
+        return word
     except Exception as e:
         st.error(f"Translation error for '{word}': {e}")
         return word  # Fallback to original word
 
 def search_news(query, namespace):
-    """Search news in three levels: direct keyword, transliteration, and exact translation."""
+    """Search news in two levels: direct keyword and transliteration (skip bad translations)."""
     keywords = extract_keywords(query)
 
     # Step 1: Direct keyword search
     direct_results = filter_news_by_title(keywords, namespace)
 
-    # Step 2: Search using Gujarati transliteration
+    # Step 2: Search using Gujarati transliteration (skip exact translation)
     transliterated_keywords = [convert_proper_noun_to_gujarati(word) for word in keywords]
     transliteration_results = filter_news_by_title(transliterated_keywords, namespace)
 
-    # Step 3: Search using exact Gujarati translation
-    translated_query = translate_text(query)
-    translated_keywords = extract_keywords(translated_query)
-    translated_results = filter_news_by_title(translated_keywords, namespace)
-
-    return direct_results + transliteration_results + translated_results, keywords, transliterated_keywords, translated_keywords
+    return direct_results + transliteration_results, keywords, transliterated_keywords
 
 def filter_news_by_title(keywords, namespace):
     """Fetches news articles and filters them based on keyword matches in the title."""
@@ -123,19 +130,17 @@ if st.button("Search News"):
     if chat_input:
         with st.spinner("Fetching news... Please wait."):
             time.sleep(1)  # Simulating processing delay
-            results, cleaned_query, transliterated_query, translated_query = search_news(chat_input, NEWSPAPER_OPTIONS[selected_newspaper])
+            results, cleaned_query, transliterated_query = search_news(chat_input, NEWSPAPER_OPTIONS[selected_newspaper])
 
         st.markdown(f"<div class='chat-bubble'><strong>Bot:</strong> Searching news for '{chat_input}'...</div>", unsafe_allow_html=True)
         if transliterated_query:
             st.markdown(f"<div class='chat-bubble'><strong>Gujarati Transliteration:</strong> {' '.join(transliterated_query)} 🇮🇳</div>", unsafe_allow_html=True)
-        if translated_query:
-            st.markdown(f"<div class='chat-bubble'><strong>Exact Translation:</strong> {' '.join(translated_query)}</div>", unsafe_allow_html=True)
 
         if results:
             for news in results:
                 metadata = news["metadata"]
-                highlighted_title = highlight_keywords(metadata["title"], cleaned_query + transliterated_query + translated_query)
-                highlighted_content = highlight_keywords(metadata["content"], cleaned_query + transliterated_query + translated_query)
+                highlighted_title = highlight_keywords(metadata["title"], cleaned_query + transliterated_query)
+                highlighted_content = highlight_keywords(metadata["content"], cleaned_query + transliterated_query)
                 
                 st.markdown(f"""
                 <div class="chat-container">
