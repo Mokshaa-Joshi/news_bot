@@ -56,8 +56,11 @@ def build_regex(query):
     else:
         return re.escape(query)
 
+# Load Hugging Face API key from Streamlit secrets
+hf_api_key = st.secrets["general"]["HUGGINGFACE_API_KEY"]
+
 def query_mixtral(prompt):
-    model = HuggingFacePipeline.from_pretrained("mistralai/Mixtral-8x7B-Instruct-v0.1")
+    model = HuggingFacePipeline.from_pretrained("mistralai/Mixtral-8x7B-Instruct-v0.1", token=hf_api_key)
     return model(prompt)
 
 # Streamlit UI
