@@ -3,11 +3,14 @@ import re
 import os
 from langchain.llms import HuggingFacePipeline
 
-def load_articles(file_path):
+def load_articles(file_path, newspaper):
     articles = []
     with open(file_path, "r", encoding="utf-8") as file:
         content = file.read()
-        articles = content.split("================================================================================")
+        if newspaper in ["Gujarat Samachar", "Divya Bhaskar"]:
+            articles = content.split("================================================================================")
+        else:  # Sandesh
+            articles = content.strip().split("\n\n")  # Assuming each article is separated by a double newline
     return [article.strip() for article in articles if article.strip()]
 
 def parse_article(article, newspaper):
@@ -80,7 +83,7 @@ file_paths = {
 
 if search_button and query:
     keyword_pattern = build_regex(query)
-    articles = load_articles(file_paths[selected_newspaper])
+    articles = load_articles(file_paths[selected_newspaper], selected_newspaper)
     results = search_articles(articles, keyword_pattern, search_type, selected_newspaper)
     
     if results:
