@@ -1,12 +1,20 @@
 import streamlit as st
 import re
 import os
+import requests
 from langchain.llms import HuggingFacePipeline
 
-def load_articles(file_path, newspaper):
+def download_articles_from_github(repo_url, filename):
+    url = f"{repo_url}/main/{filename}"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.text
+    else:
+        return None
+
+def load_articles(content, newspaper):
     articles = []
-    with open(file_path, "r", encoding="utf-8") as file:
-        content = file.read()
+    if content:
         if newspaper in ["Gujarat Samachar", "Divya Bhaskar"]:
             articles = content.split("================================================================================")
         else:  # Sandesh
@@ -75,23 +83,28 @@ search_type = st.selectbox("Search Type", ["matches with", "contains"])
 query = st.text_input("Enter Gujarati Keywords")
 search_button = st.button("Search")
 
+repo_url = "https://raw.githubusercontent.com/your-github-username/your-repo-name"
 file_paths = {
-    "Gujarat Samachar": "D:/Projects/4-Dbs/news_website/news/gs.txt",
-    "Divya Bhaskar": "D:/Projects/4-Dbs/news_website/news/db.txt",
-    "Sandesh": "D:/Projects/4-Dbs/news_website/news/s.txt"
+    "Gujarat Samachar": "news/gs.txt",
+    "Divya Bhaskar": "news/db.txt",
+    "Sandesh": "news/s.txt"
 }
 
 if search_button and query:
     keyword_pattern = build_regex(query)
-    articles = load_articles(file_paths[selected_newspaper], selected_newspaper)
-    results = search_articles(articles, keyword_pattern, search_type, selected_newspaper)
-    
-    if results:
-        for res in results:
-            st.subheader(res['title'])
-            st.write(f"**Date:** {res['date']}")
-            if 'link' in res:
-                st.write(f"[Read more]({res['link']})")
-            st.write(res['content'][:300] + "...")
+    content = download_articles_from_github(repo_url, file_paths[selected_newspaper])
+    if content:
+        articles = load_articles(content, selected_newspaper)
+        results = search_articles(articles, keyword_pattern, search_type, selected_newspaper)
+        
+        if results:
+            for res in results:
+                st.subheader(res['title'])
+                st.write(f"**Date:** {res['date']}")
+                if 'link' in res:
+                    st.write(f"[Read more]({res['link']})")
+                st.write(res['content'][:300] + "...")
+        else:
+            st.write("No articles found.")
     else:
-        st.write("No articles found.")
+        st.write("Error fetching file from GitHub. Make sure the file path is correct.")
