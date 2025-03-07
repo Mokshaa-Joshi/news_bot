@@ -45,18 +45,22 @@ def parse_article(article, newspaper):
     return None
 
 def highlight_keywords(text, keywords):
+    """Highlights the keywords in the given text."""
     for keyword in keywords:
         text = re.sub(f"({re.escape(keyword)})", r"**\1**", text, flags=re.IGNORECASE)
     return text
 
 def search_articles(articles, query, newspaper):
+    """Searches for the keyword in the title and content of articles. Only returns matching articles."""
     results = []
-    query_keywords = query.strip().split()
+    query_keywords = query.strip().split()  # Split query into words
     for article in articles:
         parsed_article = parse_article(article, newspaper)
         if parsed_article:
             title = parsed_article['title'].lower()
             content = parsed_article['content'].lower()
+
+            # Show the article only if keyword is found in title or content
             if any(keyword.lower() in title or keyword.lower() in content for keyword in query_keywords):
                 parsed_article['title'] = highlight_keywords(parsed_article['title'], query_keywords)
                 parsed_article['content'] = highlight_keywords(parsed_article['content'], query_keywords)
