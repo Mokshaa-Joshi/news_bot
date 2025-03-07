@@ -19,28 +19,29 @@ def load_articles(content, newspaper):
         if newspaper in ["Gujarat Samachar", "Divya Bhaskar"]:
             articles = content.split("================================================================================")
         elif newspaper == "Sandesh":
-            # Splitting articles based on the date pattern at the start of each article
             articles = re.split(r"(?=\w{3} \d{1,2}, \d{4} \d{2}:\d{2} (am|pm))", content)
             articles = [article.strip() for article in articles if article.strip()]
-    return articles
+
+    st.write(f"First 2 Articles Extracted: {articles[:2]}")  # Debugging
+    return [article.strip() for article in articles if article.strip()]
 
 def parse_article(article, newspaper):
     if newspaper in ["Gujarat Samachar", "Divya Bhaskar"]:
-        match = re.search(r"Title: (.*?)\nDate: (.*?)\nLink: (.*?)\nContent:\n(.*)", article, re.DOTALL)
+        match = re.search(r"Title:\s*(.*?)\nDate:\s*(.*?)\nLink:\s*(.*?)\nContent:\n(.*)", article, re.DOTALL)
         if match:
             return {
-                "title": match.group(1),
-                "date": match.group(2),
-                "link": match.group(3),
-                "content": match.group(4)
+                "title": match.group(1).strip(),
+                "date": match.group(2).strip(),
+                "link": match.group(3).strip(),
+                "content": match.group(4).strip()
             }
     elif newspaper == "Sandesh":
         lines = article.strip().split("\n")
         if len(lines) >= 3:
             return {
-                "date": lines[0],  # The first line is the date
-                "title": lines[1],  # The second line is the title
-                "content": "\n".join(lines[2:])  # The remaining lines are content
+                "date": lines[0].strip(),
+                "title": lines[1].strip(),
+                "content": "\n".join(lines[2:]).strip()
             }
     return None
 
@@ -50,6 +51,7 @@ def search_articles(articles, keyword_pattern, search_type, newspaper):
         parsed_article = parse_article(article, newspaper)
         if parsed_article:
             content_to_search = f"{parsed_article['title']} {parsed_article['content']}"
+            st.write(f"Searching in: {parsed_article['title'][:50]}...")  # Debugging
             match = re.search(keyword_pattern, content_to_search, re.IGNORECASE)
             if match:
                 results.append(parsed_article)
