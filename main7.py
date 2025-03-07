@@ -3,6 +3,7 @@ import re
 import os
 import requests
 from langchain.llms import HuggingFacePipeline
+from streamlit_extras.card import card
 
 def download_articles_from_github(repo_url, filename):
     url = f"{repo_url}/{filename}"
@@ -10,7 +11,6 @@ def download_articles_from_github(repo_url, filename):
     if response.status_code == 200:
         return response.text
     else:
-        st.write(f"Error fetching file: {url} - Status Code: {response.status_code}")
         return None
 
 def load_articles(content, newspaper):
@@ -22,8 +22,6 @@ def load_articles(content, newspaper):
         elif newspaper == "Sandesh":
             articles = re.split(r"(?=\w{3} \d{1,2}, \d{4} \d{2}:\d{2} (am|pm))", content)
             articles = [article.strip() for article in articles if article.strip()]
-
-    st.write(f"First 2 Articles Extracted: {articles[:2]}")  # Debugging
     return [article.strip() for article in articles if article.strip()]
 
 def parse_article(article, newspaper):
@@ -54,9 +52,6 @@ def search_articles(articles, keyword_pattern, search_type, newspaper):
         if parsed_article:
             content_to_search = f"{parsed_article['title']} {parsed_article['content']}"
             content_to_search = content_to_search.lower()  # Normalize case
-
-            st.write(f"Checking article: {parsed_article['title'][:50]}...")  # Debugging
-            
             match = re.search(keyword_pattern, content_to_search, re.IGNORECASE)
             if match:
                 results.append(parsed_article)
@@ -65,7 +60,6 @@ def search_articles(articles, keyword_pattern, search_type, newspaper):
 def build_regex(query):
     query = query.strip()
     query = query.lower()  # Convert to lowercase for better matching
-
     if " અને " in query:
         keywords = query.split(" અને ")
         return r".*".join(re.escape(k) for k in keywords)
@@ -101,22 +95,19 @@ file_paths = {
 
 if search_button and query:
     keyword_pattern = build_regex(query)
-    st.write(f"Using Regex Pattern: `{keyword_pattern}`")  # Debugging
     
     content = download_articles_from_github(repo_url, file_paths[selected_newspaper])
     if content:
         articles = load_articles(content, selected_newspaper)
-        st.write(f"Total Articles Loaded: {len(articles)}")  # Debugging
-        
         results = search_articles(articles, keyword_pattern, search_type, selected_newspaper)
         
         if results:
             for res in results:
-                st.subheader(res['title'])
-                st.write(f"**Date:** {res['date']}")
-                if 'link' in res:
-                    st.write(f"[Read more]({res['link']})")
-                st.write(res['content'][:300] + "...")
+                card(
+                    title=res['title'],
+                    text=f"**Date:** {res['date']}\n\n{res['content'][:200]}...",
+                    url=res.get('link', None)
+                )
         else:
             st.write("No matching articles found. Try different keywords.")
     else:
