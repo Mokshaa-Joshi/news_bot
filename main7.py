@@ -16,6 +16,7 @@ def download_articles_from_github(repo_url, filename):
 def load_articles(content, newspaper):
     articles = []
     if content:
+        content = content.replace("\r\n", "\n")  # Normalize newlines
         if newspaper in ["Gujarat Samachar", "Divya Bhaskar"]:
             articles = content.split("================================================================================")
         elif newspaper == "Sandesh":
@@ -26,8 +27,9 @@ def load_articles(content, newspaper):
     return [article.strip() for article in articles if article.strip()]
 
 def parse_article(article, newspaper):
+    article = article.strip().replace("\r\n", "\n")  # Normalize newlines
     if newspaper in ["Gujarat Samachar", "Divya Bhaskar"]:
-        match = re.search(r"Title:\s*(.*?)\nDate:\s*(.*?)\nLink:\s*(.*?)\nContent:\n(.*)", article, re.DOTALL)
+        match = re.search(r"Title:\s*(.*?)\nDate:\s*(.*?)\nLink:\s*(.*?)\nContent:\s*(.*)", article, re.DOTALL)
         if match:
             return {
                 "title": match.group(1).strip(),
@@ -36,7 +38,7 @@ def parse_article(article, newspaper):
                 "content": match.group(4).strip()
             }
     elif newspaper == "Sandesh":
-        lines = article.strip().split("\n")
+        lines = article.split("\n")
         if len(lines) >= 3:
             return {
                 "date": lines[0].strip(),
@@ -51,7 +53,10 @@ def search_articles(articles, keyword_pattern, search_type, newspaper):
         parsed_article = parse_article(article, newspaper)
         if parsed_article:
             content_to_search = f"{parsed_article['title']} {parsed_article['content']}"
-            st.write(f"Searching in: {parsed_article['title'][:50]}...")  # Debugging
+            content_to_search = content_to_search.lower()  # Normalize case
+
+            st.write(f"Checking article: {parsed_article['title'][:50]}...")  # Debugging
+            
             match = re.search(keyword_pattern, content_to_search, re.IGNORECASE)
             if match:
                 results.append(parsed_article)
@@ -59,6 +64,8 @@ def search_articles(articles, keyword_pattern, search_type, newspaper):
 
 def build_regex(query):
     query = query.strip()
+    query = query.lower()  # Convert to lowercase for better matching
+
     if " અને " in query:
         keywords = query.split(" અને ")
         return r".*".join(re.escape(k) for k in keywords)
