@@ -83,11 +83,11 @@ search_type = st.selectbox("Search Type", ["matches with", "contains"])
 query = st.text_input("Enter Gujarati Keywords")
 search_button = st.button("Search")
 
-repo_url = "https://raw.githubusercontent.com/your-github-username/your-repo-name"
+repo_url = "https://github.com/Mokshaa-Joshi/news_bot/blob/main"
 file_paths = {
-    "Gujarat Samachar": "news/gs.txt",
-    "Divya Bhaskar": "news/db.txt",
-    "Sandesh": "news/s.txt"
+    "Gujarat Samachar": "/gs.txt",
+    "Divya Bhaskar": "/db.txt",
+    "Sandesh": "/s.txt"
 }
 
 if search_button and query:
