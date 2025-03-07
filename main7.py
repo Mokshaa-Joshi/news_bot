@@ -59,12 +59,12 @@ def build_regex(query):
     query = query.strip().lower()
     if " અને " in query:
         keywords = query.split(" અને ")
-        return r".*".join(re.escape(k) for k in keywords)
+        return r".*".join(r"\b" + re.escape(k) + r"\b" for k in keywords)
     elif " અથવા " in query:
         keywords = query.split(" અથવા ")
-        return r"|".join(re.escape(k) for k in keywords)
+        return r"|".join(r"\b" + re.escape(k) + r"\b" for k in keywords)
     else:
-        return re.escape(query)
+        return r"\b" + re.escape(query) + r"\b"
 
 # Load Hugging Face API key safely
 hf_api_key = st.secrets.get("HUGGINGFACE_API_KEY", None)
@@ -104,7 +104,7 @@ if search_button and query:
                     st.markdown(f"**Date:** {res['date']}")
                     if 'link' in res:
                         st.markdown(f"[Read more]({res['link']})")
-                    st.markdown(f"{res['content'][:300]}...")
+                    st.markdown(f"{res['content']}")
                     st.markdown("---")
         else:
             st.write("No matching articles found. Try different keywords.")
