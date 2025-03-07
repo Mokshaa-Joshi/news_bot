@@ -45,9 +45,9 @@ def parse_article(article, newspaper):
     return None
 
 def highlight_keywords(text, keywords):
-    """Highlights the keywords in the given text."""
+    """Highlights the keywords in the given text using HTML."""
     for keyword in keywords:
-        text = re.sub(f"({re.escape(keyword)})", r"**\1**", text, flags=re.IGNORECASE)
+        text = re.sub(f"({re.escape(keyword)})", r'<span style="background-color: yellow; font-weight: bold;">\1</span>', text, flags=re.IGNORECASE)
     return text
 
 def search_articles(articles, query, newspaper):
@@ -99,12 +99,12 @@ if search_button and query:
         if results:
             for res in results:
                 with st.container():
-                    st.markdown(f"### {res['title']}")
-                    st.markdown(f"**Date:** {res['date']}")
+                    st.markdown(f"<h3>{res['title']}</h3>", unsafe_allow_html=True)
+                    st.markdown(f"<strong>Date:</strong> {res['date']}", unsafe_allow_html=True)
                     if 'link' in res:
-                        st.markdown(f"[Read more]({res['link']})")
-                    st.markdown(f"{res['content']}")
-                    st.markdown("---")
+                        st.markdown(f'<a href="{res["link"]}" target="_blank">Read more</a>', unsafe_allow_html=True)
+                    st.markdown(f"{res['content']}", unsafe_allow_html=True)
+                    st.markdown("<hr>", unsafe_allow_html=True)
         else:
             st.write("No matching articles found. Try different keywords.")
     else:
