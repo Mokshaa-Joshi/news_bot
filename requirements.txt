@@ -8,3 +8,6 @@ spacy
 langchain_huggingface
 sentence_transformers
 langdetect
+langchain
+transformers
+huggingface_hub
