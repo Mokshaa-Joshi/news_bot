@@ -1,18 +1,18 @@
 import streamlit as st
 import re
-import os
 import requests
 from langchain.llms import HuggingFacePipeline
 
 def download_articles_from_github(repo_url, filename):
+    """Fetches articles from a GitHub raw file URL."""
     url = f"{repo_url}/{filename}"
     response = requests.get(url)
     if response.status_code == 200:
         return response.text
-    else:
-        return None
+    return None
 
 def load_articles(content, newspaper):
+    """Splits raw content into individual articles based on newspaper format."""
     articles = []
     if content:
         content = content.replace("\r\n", "\n")  # Normalize newlines
@@ -24,6 +24,7 @@ def load_articles(content, newspaper):
     return [article.strip() for article in articles if article.strip()]
 
 def parse_article(article, newspaper):
+    """Extracts structured data (title, date, content) from raw article text."""
     article = article.strip().replace("\r\n", "\n")  # Normalize newlines
     if newspaper in ["Gujarat Samachar", "Divya Bhaskar"]:
         match = re.search(r"Title:\s*(.*?)\nDate:\s*(.*?)\nLink:\s*(.*?)\nContent:\s*(.*)", article, re.DOTALL)
@@ -51,7 +52,7 @@ def highlight_keywords(text, keywords):
     return text
 
 def search_articles(articles, query, search_type, newspaper):
-    """Searches for the keyword in the title and content of articles based on search type."""
+    """Searches for keywords in article titles and content based on search type."""
     results = []
     
     if " અને " in query:  # AND search
@@ -63,38 +64,41 @@ def search_articles(articles, query, search_type, newspaper):
     else:
         query_keywords = [query.strip()]
         keyword_pattern = re.escape(query.strip())
-    
+
     for article in articles:
         parsed_article = parse_article(article, newspaper)
         if parsed_article:
             content_to_search = f"{parsed_article['title']} {parsed_article['content']}".lower()
+            
             if search_type == "contains":
                 match = re.search(keyword_pattern, content_to_search, re.IGNORECASE)
-            else:  # "matches with"
+            else:  # "matches with" (exact word match)
                 match = re.search(r"\b" + keyword_pattern + r"\b", content_to_search, re.IGNORECASE)
 
             if match:
                 parsed_article['title'] = highlight_keywords(parsed_article['title'], query_keywords)
                 parsed_article['content'] = highlight_keywords(parsed_article['content'], query_keywords)
                 results.append(parsed_article)
+
     return results
 
 # Load Hugging Face API key safely
 hf_api_key = st.secrets.get("HUGGINGFACE_API_KEY", None)
 
 def query_mixtral(prompt):
+    """Uses Hugging Face API to generate AI-based responses."""
     if not hf_api_key:
         return "Error: Hugging Face API Key is missing!"
     model = HuggingFacePipeline.from_pretrained("mistralai/Mixtral-8x7B-Instruct-v0.1", token=hf_api_key)
     return model(prompt)
 
 # Streamlit UI
-st.title("Gujarati Newspaper Search")
+st.title("Gujarati Newspaper Search 📰")
 
-selected_newspaper = st.selectbox("Select Newspaper", ["Gujarat Samachar", "Divya Bhaskar", "Sandesh"])
-search_type = st.selectbox("Search Type", ["matches with", "contains"])
-query = st.text_input("Enter Gujarati Keywords")
-search_button = st.button("Search")
+selected_newspaper = st.selectbox("📌 Select Newspaper", ["Gujarat Samachar", "Divya Bhaskar", "Sandesh"])
+search_type = st.selectbox("🔍 Search Type", ["matches with", "contains"])
+query = st.text_input("🔎 Enter Gujarati Keywords")
+search_button = st.button("Search 🔍")
 
 repo_url = "https://raw.githubusercontent.com/Mokshaa-Joshi/news_bot/main"
 file_paths = {
@@ -105,6 +109,7 @@ file_paths = {
 
 if search_button and query:
     content = download_articles_from_github(repo_url, file_paths[selected_newspaper])
+    
     if content:
         articles = load_articles(content, selected_newspaper)
         results = search_articles(articles, query, search_type, selected_newspaper)
@@ -113,12 +118,6 @@ if search_button and query:
             for res in results:
                 with st.container():
                     st.markdown(f"<h3>{res['title']}</h3>", unsafe_allow_html=True)
-                    st.markdown(f"<strong>Date:</strong> {res['date']}", unsafe_allow_html=True)
+                    st.markdown(f"<strong>📅 Date:</strong> {res['date']}", unsafe_allow_html=True)
                     if 'link' in res:
-                        st.markdown(f'<a href="{res["link"]}" target="_blank">Read more</a>', unsafe_allow_html=True)
-                    st.markdown(f"{res['content']}", unsafe_allow_html=True)
-                    st.markdown("<hr>", unsafe_allow_html=True)
-        else:
-            st.write("No matching articles found. Try different keywords.")
-    else:
-        st.write("Error fetching file from GitHub. Make sure the file path is correct.")
+                        st.markdown(f'<a href="{res["link"]}" target="_blank">🔗 Read more
