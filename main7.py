@@ -58,8 +58,8 @@ def search_articles(articles, query, search_type, newspaper):
     if " અને " in query:  # AND search
         query_keywords = query.strip().split(" અને ")
         keyword_pattern = r".*".join(re.escape(k) for k in query_keywords)
-    elif " અથવા " in query or " કે " in query:  # OR search
-        query_keywords = query.strip().split(" અથવા | કે")
+    elif " અથવા " in query or " કે " in query:  # OR search (supports both OR terms)
+        query_keywords = re.split(r" અથવા | કે ", query.strip())  # Split by either "અથવા" or "કે"
         keyword_pattern = r"|".join(re.escape(k) for k in query_keywords)
     else:
         query_keywords = [query.strip()]
