@@ -11,3 +11,4 @@ langdetect
 langchain
 transformers
 huggingface_hub
+langchain_community
