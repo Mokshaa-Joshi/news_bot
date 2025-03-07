@@ -44,27 +44,24 @@ def parse_article(article, newspaper):
             }
     return None
 
-def search_articles(articles, keyword_pattern, search_type, newspaper):
+def highlight_keywords(text, keywords):
+    for keyword in keywords:
+        text = re.sub(f"({re.escape(keyword)})", r"**\1**", text, flags=re.IGNORECASE)
+    return text
+
+def search_articles(articles, query, newspaper):
     results = []
+    query_keywords = query.strip().split()
     for article in articles:
         parsed_article = parse_article(article, newspaper)
         if parsed_article:
-            content_to_search = f"{parsed_article['title']} {parsed_article['content']}".lower()
-            match = re.search(keyword_pattern, content_to_search, re.IGNORECASE)
-            if match:
+            title = parsed_article['title'].lower()
+            content = parsed_article['content'].lower()
+            if any(keyword.lower() in title or keyword.lower() in content for keyword in query_keywords):
+                parsed_article['title'] = highlight_keywords(parsed_article['title'], query_keywords)
+                parsed_article['content'] = highlight_keywords(parsed_article['content'], query_keywords)
                 results.append(parsed_article)
     return results
-
-def build_regex(query):
-    query = query.strip().lower()
-    if " અને " in query:
-        keywords = query.split(" અને ")
-        return r".*".join(r"\b" + re.escape(k) + r"\b" for k in keywords)
-    elif " અથવા " in query:
-        keywords = query.split(" અથવા ")
-        return r"|".join(r"\b" + re.escape(k) + r"\b" for k in keywords)
-    else:
-        return r"\b" + re.escape(query) + r"\b"
 
 # Load Hugging Face API key safely
 hf_api_key = st.secrets.get("HUGGINGFACE_API_KEY", None)
@@ -79,7 +76,6 @@ def query_mixtral(prompt):
 st.title("Gujarati Newspaper Search")
 
 selected_newspaper = st.selectbox("Select Newspaper", ["Gujarat Samachar", "Divya Bhaskar", "Sandesh"])
-search_type = st.selectbox("Search Type", ["matches with", "contains"])
 query = st.text_input("Enter Gujarati Keywords")
 search_button = st.button("Search")
 
@@ -91,11 +87,10 @@ file_paths = {
 }
 
 if search_button and query:
-    keyword_pattern = build_regex(query)
     content = download_articles_from_github(repo_url, file_paths[selected_newspaper])
     if content:
         articles = load_articles(content, selected_newspaper)
-        results = search_articles(articles, keyword_pattern, search_type, selected_newspaper)
+        results = search_articles(articles, query, selected_newspaper)
         
         if results:
             for res in results:
