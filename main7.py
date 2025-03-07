@@ -48,10 +48,7 @@ def search_articles(articles, keyword_pattern, search_type, newspaper):
         parsed_article = parse_article(article, newspaper)
         if parsed_article:
             content_to_search = f"{parsed_article['title']} {parsed_article['content']}"
-            if search_type == "matches with":
-                match = re.search(f"^{keyword_pattern}$", content_to_search, re.IGNORECASE)
-            else:  # 'contains'
-                match = re.search(keyword_pattern, content_to_search, re.IGNORECASE)
+            match = re.search(keyword_pattern, content_to_search, re.IGNORECASE)
             if match:
                 results.append(parsed_article)
     return results
@@ -60,12 +57,12 @@ def build_regex(query):
     query = query.strip()
     if " અને " in query:
         keywords = query.split(" અને ")
-        return r".*".join(re.escape(k) for k in keywords)
+        return r".*".join(r"\b" + re.escape(k) + r"\b" for k in keywords)
     elif " અથવા " in query:
         keywords = query.split(" અથવા ")
-        return r"|".join(re.escape(k) for k in keywords)
+        return r"|".join(r"\b" + re.escape(k) + r"\b" for k in keywords)
     else:
-        return re.escape(query)
+        return r"\b" + re.escape(query) + r"\b"
 
 # Load Hugging Face API key safely
 hf_api_key = st.secrets.get("HUGGINGFACE_API_KEY", None)
