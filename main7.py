@@ -119,5 +119,11 @@ if search_button and query:
                 with st.container():
                     st.markdown(f"<h3>{res['title']}</h3>", unsafe_allow_html=True)
                     st.markdown(f"<strong>📅 Date:</strong> {res['date']}", unsafe_allow_html=True)
-                    if 'link' in res:
-                        st.markdown(f'<a href="{res["link"]}" target="_blank">🔗 Read more
+                    if 'link' in res and res['link']:
+                        st.markdown(f'<a href="{res["link"]}" target="_blank">🔗 Read more</a>', unsafe_allow_html=True)
+                    st.markdown(f"{res['content']}", unsafe_allow_html=True)
+                    st.markdown("<hr>", unsafe_allow_html=True)
+        else:
+            st.write("⚠️ No matching articles found. Try different keywords.")
+    else:
+        st.write("❌ Error fetching file from GitHub. Make sure the file path is correct.")
