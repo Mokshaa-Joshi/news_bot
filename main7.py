@@ -3,13 +3,12 @@ import re
 import os
 from langchain.llms import HuggingFacePipeline
 
-def load_articles(directory, newspaper):
+def load_articles(file_path):
     articles = []
-    for filename in os.listdir(directory):
-        if filename.endswith(".txt") and newspaper in filename:
-            with open(os.path.join(directory, filename), "r", encoding="utf-8") as file:
-                articles.append(file.read())
-    return articles
+    with open(file_path, "r", encoding="utf-8") as file:
+        content = file.read()
+        articles = content.split("================================================================================")
+    return [article.strip() for article in articles if article.strip()]
 
 def parse_article(article, newspaper):
     if newspaper in ["Gujarat Samachar", "Divya Bhaskar"]:
@@ -31,10 +30,10 @@ def parse_article(article, newspaper):
             }
     return None
 
-def search_articles(articles, keyword_pattern, search_type):
+def search_articles(articles, keyword_pattern, search_type, newspaper):
     results = []
     for article in articles:
-        parsed_article = parse_article(article, selected_newspaper)
+        parsed_article = parse_article(article, newspaper)
         if parsed_article:
             content_to_search = f"{parsed_article['title']} {parsed_article['content']}"
             if search_type == "matches with":
@@ -73,10 +72,16 @@ search_type = st.selectbox("Search Type", ["matches with", "contains"])
 query = st.text_input("Enter Gujarati Keywords")
 search_button = st.button("Search")
 
+file_paths = {
+    "Gujarat Samachar": "D:/Projects/4-Dbs/news_website/news/gs.txt",
+    "Divya Bhaskar": "D:/Projects/4-Dbs/news_website/news/db.txt",
+    "Sandesh": "D:/Projects/4-Dbs/news_website/news/s.txt"
+}
+
 if search_button and query:
     keyword_pattern = build_regex(query)
-    articles = load_articles("news_articles", selected_newspaper)
-    results = search_articles(articles, keyword_pattern, search_type)
+    articles = load_articles(file_paths[selected_newspaper])
+    results = search_articles(articles, keyword_pattern, search_type, selected_newspaper)
     
     if results:
         for res in results:
