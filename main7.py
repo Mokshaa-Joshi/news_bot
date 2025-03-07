@@ -18,8 +18,9 @@ def load_articles(content, newspaper):
     if content:
         if newspaper in ["Gujarat Samachar", "Divya Bhaskar"]:
             articles = content.split("================================================================================")
-        else:  # Sandesh
-            articles = content.strip().split("\n\n")  # Assuming each article is separated by a double newline
+        elif newspaper == "Sandesh":
+            articles = re.split(r"(\d{2}\s\w+\s\d{4}\s\d{2}:\d{2}\s(?:am|pm))", content)
+            articles = [articles[i] + articles[i + 1] for i in range(1, len(articles) - 1, 2)]
     return [article.strip() for article in articles if article.strip()]
 
 def parse_article(article, newspaper):
@@ -57,12 +58,12 @@ def build_regex(query):
     query = query.strip()
     if " અને " in query:
         keywords = query.split(" અને ")
-        return r".*".join(r"\b" + re.escape(k) + r"\b" for k in keywords)
+        return r".*".join(re.escape(k) for k in keywords)
     elif " અથવા " in query:
         keywords = query.split(" અથવા ")
-        return r"|".join(r"\b" + re.escape(k) + r"\b" for k in keywords)
+        return r"|".join(re.escape(k) for k in keywords)
     else:
-        return r"\b" + re.escape(query) + r"\b"
+        return re.escape(query)
 
 # Load Hugging Face API key safely
 hf_api_key = st.secrets.get("HUGGINGFACE_API_KEY", None)
