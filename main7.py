@@ -19,9 +19,10 @@ def load_articles(content, newspaper):
         if newspaper in ["Gujarat Samachar", "Divya Bhaskar"]:
             articles = content.split("================================================================================")
         elif newspaper == "Sandesh":
-            articles = re.split(r"(\d{2}\s\w+\s\d{4}\s\d{2}:\d{2}\s(?:am|pm))", content)
-            articles = [articles[i] + articles[i + 1] for i in range(1, len(articles) - 1, 2)]
-    return [article.strip() for article in articles if article.strip()]
+            # Splitting articles based on the date pattern at the start of each article
+            articles = re.split(r"(?=\w{3} \d{1,2}, \d{4} \d{2}:\d{2} (am|pm))", content)
+            articles = [article.strip() for article in articles if article.strip()]
+    return articles
 
 def parse_article(article, newspaper):
     if newspaper in ["Gujarat Samachar", "Divya Bhaskar"]:
@@ -37,9 +38,9 @@ def parse_article(article, newspaper):
         lines = article.strip().split("\n")
         if len(lines) >= 3:
             return {
-                "date": lines[0],
-                "title": lines[1],
-                "content": "\n".join(lines[2:])
+                "date": lines[0],  # The first line is the date
+                "title": lines[1],  # The second line is the title
+                "content": "\n".join(lines[2:])  # The remaining lines are content
             }
     return None
 
