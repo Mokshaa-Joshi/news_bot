@@ -56,10 +56,12 @@ def build_regex(query):
     else:
         return re.escape(query)
 
-# Load Hugging Face API key from Streamlit secrets
-hf_api_key = st.secrets["general"]["HUGGINGFACE_API_KEY"]
+# Load Hugging Face API key safely
+hf_api_key = st.secrets.get("HUGGINGFACE_API_KEY", None)
 
 def query_mixtral(prompt):
+    if not hf_api_key:
+        return "Error: Hugging Face API Key is missing!"
     model = HuggingFacePipeline.from_pretrained("mistralai/Mixtral-8x7B-Instruct-v0.1", token=hf_api_key)
     return model(prompt)
 
