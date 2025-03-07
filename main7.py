@@ -68,7 +68,11 @@ def search_articles(articles, query, search_type, newspaper):
         parsed_article = parse_article(article, newspaper)
         if parsed_article:
             content_to_search = f"{parsed_article['title']} {parsed_article['content']}".lower()
-            match = re.search(keyword_pattern, content_to_search, re.IGNORECASE) if search_type == "contains" else re.fullmatch(keyword_pattern, content_to_search, re.IGNORECASE)
+            if search_type == "contains":
+                match = re.search(keyword_pattern, content_to_search, re.IGNORECASE)
+            else:  # "matches with"
+                match = re.search(r"\b" + keyword_pattern + r"\b", content_to_search, re.IGNORECASE)
+
             if match:
                 parsed_article['title'] = highlight_keywords(parsed_article['title'], query_keywords)
                 parsed_article['content'] = highlight_keywords(parsed_article['content'], query_keywords)
