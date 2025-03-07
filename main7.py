@@ -50,30 +50,28 @@ def highlight_keywords(text, keywords):
         text = re.sub(f"({re.escape(keyword)})", r'<span style="background-color: yellow; font-weight: bold;">\1</span>', text, flags=re.IGNORECASE)
     return text
 
-def build_regex(query):
-    query = query.strip()
-    if " અને " in query:
-        keywords = query.split(" અને ")
-        return r".*".join(re.escape(k) for k in keywords)
-    elif " અથવા " in query:
-        keywords = query.split(" અથવા ")
-        return r"|".join(re.escape(k) for k in keywords)
-    else:
-        return re.escape(query)
-
-def search_articles(articles, keyword_pattern, search_type, newspaper):
+def search_articles(articles, query, search_type, newspaper):
+    """Searches for the keyword in the title and content of articles based on search type."""
     results = []
+    
+    if " અને " in query:  # AND search
+        query_keywords = query.strip().split(" અને ")
+        keyword_pattern = r".*".join(re.escape(k) for k in query_keywords)
+    elif " અથવા " in query:  # OR search
+        query_keywords = query.strip().split(" અથવા ")
+        keyword_pattern = r"|".join(re.escape(k) for k in query_keywords)
+    else:
+        query_keywords = [query.strip()]
+        keyword_pattern = re.escape(query.strip())
+    
     for article in articles:
         parsed_article = parse_article(article, newspaper)
         if parsed_article:
-            content_to_search = f"{parsed_article['title']} {parsed_article['content']}"
-            if search_type == "matches with":
-                match = re.fullmatch(keyword_pattern, content_to_search)
-            else:  # 'contains'
-                match = re.search(keyword_pattern, content_to_search)
+            content_to_search = f"{parsed_article['title']} {parsed_article['content']}".lower()
+            match = re.search(keyword_pattern, content_to_search, re.IGNORECASE) if search_type == "contains" else re.fullmatch(keyword_pattern, content_to_search, re.IGNORECASE)
             if match:
-                parsed_article['title'] = highlight_keywords(parsed_article['title'], [keyword_pattern])
-                parsed_article['content'] = highlight_keywords(parsed_article['content'], [keyword_pattern])
+                parsed_article['title'] = highlight_keywords(parsed_article['title'], query_keywords)
+                parsed_article['content'] = highlight_keywords(parsed_article['content'], query_keywords)
                 results.append(parsed_article)
     return results
 
@@ -102,11 +100,10 @@ file_paths = {
 }
 
 if search_button and query:
-    keyword_pattern = build_regex(query)
     content = download_articles_from_github(repo_url, file_paths[selected_newspaper])
     if content:
         articles = load_articles(content, selected_newspaper)
-        results = search_articles(articles, keyword_pattern, search_type, selected_newspaper)
+        results = search_articles(articles, query, search_type, selected_newspaper)
         
         if results:
             for res in results:
