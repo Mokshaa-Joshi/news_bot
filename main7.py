@@ -3,7 +3,6 @@ import re
 import os
 import requests
 from langchain.llms import HuggingFacePipeline
-from streamlit_extras.card import card
 
 def download_articles_from_github(repo_url, filename):
     url = f"{repo_url}/{filename}"
@@ -50,16 +49,14 @@ def search_articles(articles, keyword_pattern, search_type, newspaper):
     for article in articles:
         parsed_article = parse_article(article, newspaper)
         if parsed_article:
-            content_to_search = f"{parsed_article['title']} {parsed_article['content']}"
-            content_to_search = content_to_search.lower()  # Normalize case
+            content_to_search = f"{parsed_article['title']} {parsed_article['content']}".lower()
             match = re.search(keyword_pattern, content_to_search, re.IGNORECASE)
             if match:
                 results.append(parsed_article)
     return results
 
 def build_regex(query):
-    query = query.strip()
-    query = query.lower()  # Convert to lowercase for better matching
+    query = query.strip().lower()
     if " અને " in query:
         keywords = query.split(" અને ")
         return r".*".join(re.escape(k) for k in keywords)
@@ -95,7 +92,6 @@ file_paths = {
 
 if search_button and query:
     keyword_pattern = build_regex(query)
-    
     content = download_articles_from_github(repo_url, file_paths[selected_newspaper])
     if content:
         articles = load_articles(content, selected_newspaper)
@@ -103,11 +99,13 @@ if search_button and query:
         
         if results:
             for res in results:
-                card(
-                    title=res['title'],
-                    text=f"**Date:** {res['date']}\n\n{res['content'][:200]}...",
-                    url=res.get('link', None)
-                )
+                with st.container():
+                    st.markdown(f"### {res['title']}")
+                    st.markdown(f"**Date:** {res['date']}")
+                    if 'link' in res:
+                        st.markdown(f"[Read more]({res['link']})")
+                    st.markdown(f"{res['content'][:300]}...")
+                    st.markdown("---")
         else:
             st.write("No matching articles found. Try different keywords.")
     else:
