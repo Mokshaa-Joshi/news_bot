@@ -10,6 +10,7 @@ def download_articles_from_github(repo_url, filename):
     if response.status_code == 200:
         return response.text
     else:
+        st.write(f"Error fetching file: {url} - Status Code: {response.status_code}")
         return None
 
 def load_articles(content, newspaper):
@@ -48,9 +49,9 @@ def search_articles(articles, keyword_pattern, search_type, newspaper):
         if parsed_article:
             content_to_search = f"{parsed_article['title']} {parsed_article['content']}"
             if search_type == "matches with":
-                match = re.fullmatch(keyword_pattern, content_to_search)
+                match = re.search(f"^{keyword_pattern}$", content_to_search, re.IGNORECASE)
             else:  # 'contains'
-                match = re.search(keyword_pattern, content_to_search)
+                match = re.search(keyword_pattern, content_to_search, re.IGNORECASE)
             if match:
                 results.append(parsed_article)
     return results
@@ -92,9 +93,13 @@ file_paths = {
 
 if search_button and query:
     keyword_pattern = build_regex(query)
+    st.write(f"Using Regex Pattern: `{keyword_pattern}`")  # Debugging
+    
     content = download_articles_from_github(repo_url, file_paths[selected_newspaper])
     if content:
         articles = load_articles(content, selected_newspaper)
+        st.write(f"Total Articles Loaded: {len(articles)}")  # Debugging
+        
         results = search_articles(articles, keyword_pattern, search_type, selected_newspaper)
         
         if results:
@@ -105,6 +110,6 @@ if search_button and query:
                     st.write(f"[Read more]({res['link']})")
                 st.write(res['content'][:300] + "...")
         else:
-            st.write("No articles found.")
+            st.write("No matching articles found. Try different keywords.")
     else:
         st.write("Error fetching file from GitHub. Make sure the file path is correct.")
