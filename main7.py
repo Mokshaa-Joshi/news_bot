@@ -50,20 +50,30 @@ def highlight_keywords(text, keywords):
         text = re.sub(f"({re.escape(keyword)})", r'<span style="background-color: yellow; font-weight: bold;">\1</span>', text, flags=re.IGNORECASE)
     return text
 
-def search_articles(articles, query, newspaper):
-    """Searches for the keyword in the title and content of articles. Only returns matching articles."""
+def build_regex(query):
+    query = query.strip()
+    if " અને " in query:
+        keywords = query.split(" અને ")
+        return r".*".join(re.escape(k) for k in keywords)
+    elif " અથવા " in query:
+        keywords = query.split(" અથવા ")
+        return r"|".join(re.escape(k) for k in keywords)
+    else:
+        return re.escape(query)
+
+def search_articles(articles, keyword_pattern, search_type, newspaper):
     results = []
-    query_keywords = query.strip().split()  # Split query into words
     for article in articles:
         parsed_article = parse_article(article, newspaper)
         if parsed_article:
-            title = parsed_article['title'].lower()
-            content = parsed_article['content'].lower()
-
-            # Show the article only if keyword is found in title or content
-            if any(keyword.lower() in title or keyword.lower() in content for keyword in query_keywords):
-                parsed_article['title'] = highlight_keywords(parsed_article['title'], query_keywords)
-                parsed_article['content'] = highlight_keywords(parsed_article['content'], query_keywords)
+            content_to_search = f"{parsed_article['title']} {parsed_article['content']}"
+            if search_type == "matches with":
+                match = re.fullmatch(keyword_pattern, content_to_search)
+            else:  # 'contains'
+                match = re.search(keyword_pattern, content_to_search)
+            if match:
+                parsed_article['title'] = highlight_keywords(parsed_article['title'], [keyword_pattern])
+                parsed_article['content'] = highlight_keywords(parsed_article['content'], [keyword_pattern])
                 results.append(parsed_article)
     return results
 
@@ -80,6 +90,7 @@ def query_mixtral(prompt):
 st.title("Gujarati Newspaper Search")
 
 selected_newspaper = st.selectbox("Select Newspaper", ["Gujarat Samachar", "Divya Bhaskar", "Sandesh"])
+search_type = st.selectbox("Search Type", ["matches with", "contains"])
 query = st.text_input("Enter Gujarati Keywords")
 search_button = st.button("Search")
 
@@ -91,10 +102,11 @@ file_paths = {
 }
 
 if search_button and query:
+    keyword_pattern = build_regex(query)
     content = download_articles_from_github(repo_url, file_paths[selected_newspaper])
     if content:
         articles = load_articles(content, selected_newspaper)
-        results = search_articles(articles, query, selected_newspaper)
+        results = search_articles(articles, keyword_pattern, search_type, selected_newspaper)
         
         if results:
             for res in results:
